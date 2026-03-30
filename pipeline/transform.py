@@ -31,4 +31,6 @@ class DataTransformer:
         # Normilize to 0-1 range
         label = label.astype(np.float32) / 255.0
 
+        label = np.expand_dims(label, axis=0)
+
         return label

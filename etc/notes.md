@@ -22,10 +22,17 @@ System that ingests a dataset with satelite and drone taken images to detect a r
 ## Work to do and outcomes
 - We need to see how our data looks like in the first place. What size images are? Are they grayscale (0-255) or they binary (0, 1). Our images are 1500 by 1500 which is high resolution for my machine, our mask data has only black and white colors, which is very comfortable
 
-- We need to cut those big images into 512x512 pieces to work with them, meaning once we ingest we need to start cutting them and store, this will be normalization step.
+- We need to cut those big images into 512x512 pieces to work with them, meaning once we ingest we need to start cutting them and store and then normilize by dividing it by 255.
+
+- I have DataIngester that knows where are the files and makes them comfortable to access and DataTransformer that knows how to clean them and prepare for training. Now i need Pytorch Dataset which will be like a container that will automate the ingestion and transformation.z 
 
 
 
 ## Knowledge
 Grayscale: Reducing 3 color channels (Red, Green, Blue) into 1 channel (Brightness).
 Normalization: Changing the range of the numbers.
+
+Normalixation of the images - by default OpenCV loads images in 0-255 range, but neural networks does not like it, because if we do for example multiplication, we end up with a huge number, we also need a precision for calculation (meaning float number). So what do we do? Divide pixels by 255:
+255/255 = 1 White
+0/255 = 0 Black
+127/255 = 0.5 Gray
