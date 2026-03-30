@@ -24,7 +24,9 @@ System that ingests a dataset with satelite and drone taken images to detect a r
 
 - We need to cut those big images into 512x512 pieces to work with them, meaning once we ingest we need to start cutting them and store and then normilize by dividing it by 255.
 
-- I have DataIngester that knows where are the files and makes them comfortable to access and DataTransformer that knows how to clean them and prepare for training. Now i need Pytorch Dataset which will be like a container that will automate the ingestion and transformation.z 
+- I have DataIngester that knows where are the files and makes them comfortable to access and DataTransformer that knows how to clean them and prepare for training. Now i need Pytorch Dataset which will be like a container that will automate the ingestion and transformation.
+
+- Set up ML model U net and DataLoader to orchestrate the process.
 
 
 
