@@ -20,8 +20,18 @@ class DataIngestor:
             ]  # Get the name of an image without it's extension .tiff
             if image_stem in label_map:
                 matching_label = label_map[image_stem]
+
                 full_image_path = os.path.join(self.raw_images, image)
                 full_label_path = os.path.join(self.raw_labels, matching_label)
+                # Check if pathes are valid
+                if (
+                    os.path.getsize(full_image_path) > 0
+                    and os.path.getsize(full_label_path) > 0
+                ):
+                    self.data_pair.append((full_image_path, full_label_path))
+                else:
+                    print(f"Skipping corrupted file: {image}")
+
                 self.data_pair.append((full_image_path, full_label_path))
 
         return self.data_pair
