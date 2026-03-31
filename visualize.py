@@ -14,8 +14,9 @@ def save_prediction(model, dataset, index, device, filename="result.png"):
         output = model(input_tensor)
         prediction = torch.sigmoid(output).squeeze().cpu().numpy()
 
+    probs = torch.sigmoid(output)
+    prediction = probs.squeeze().cpu().numpy()
     prediction_binary = (prediction > 0.5).astype(np.uint8) * 255
 
-    # 5. Save it
     cv2.imwrite(filename, prediction_binary)
     print(f"Prediction saved to {filename}")
