@@ -1,4 +1,4 @@
-"""Make data comfortable to work with and to feed to the Machine Learning model"""
+"""Make data comfortable to work with and to feed to ML model"""
 
 import cv2
 import numpy as np
@@ -17,20 +17,20 @@ class DataTransformer:
         # Resize (tailored to my machine)
         img = cv2.resize(img, self.resized_images)
 
-        # The Math: Convert to float and normalize
+        # Convert to float and normalize
         img = img.astype(np.float32) / 255.0
 
         return img
 
-    def process_labels(self, label_path):
-        label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+    def process_labels(self, mask_path):
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
-        # Resize to the images size
-        label = cv2.resize(label, self.resized_images)
+        # Resize the image and make sure it is it is binary
+        mask = cv2.resize(mask, self.resized_images, interpolation=cv2.INTER_NEAREST)
+        _, mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
 
-        # Normilize to 0-1 range
-        label = label.astype(np.float32) / 255.0
+        # Normilize to 0-1
+        mask = mask.astype(np.float32) / 255.0
+        mask = np.expand_dims(mask, axis=0)
 
-        label = np.expand_dims(label, axis=0)
-
-        return label
+        return mask

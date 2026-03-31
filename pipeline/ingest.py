@@ -1,3 +1,5 @@
+"""Ingest sorted into pairs dataset into the system"""
+
 import os
 import logging
 
