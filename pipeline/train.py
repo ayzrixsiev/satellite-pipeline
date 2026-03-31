@@ -14,10 +14,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 # Set up the "Judge". How wrong am i?
-criterion = smp.losses.DiceLoss(mode="binary")
+criterion = torch.nn.BCEWithLogitsLoss()
 
 # Set up the "Teacher". How to fix my mistakes? We use Adam because it is
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 print(f"Model is loaded on: {device}")
 

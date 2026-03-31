@@ -1,38 +1,53 @@
-"""Find a necessary data, check the data type (tiff) and then find image and it's label pair"""
-
 import os
+import logging
+
+# Logger to use instead of print
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 class DataIngestor:
-    def __init__(self, raw_images, raw_labels):
-        self.raw_images = raw_images
-        self.raw_labels = raw_labels
-        self.data_pairs = []
 
-    def make_pairs(self):
-        image_files = os.listdir(self.raw_images)
-        label_files = os.listdir(self.raw_labels)
-        # Creating a dict of {"Stem": "Full file name"}, stem is a name before .tif
-        label_map = {os.path.splitext(f)[0]: f for f in label_files}
-        for image in image_files:
-            image_stem = os.path.splitext(image)[
-                0
-            ]  # Get the name of an image without it's extension .tiff
-            if image_stem in label_map:
-                matching_label = label_map[image_stem]
+    # Get the path to the dataset and make list of images
+    def __init__(self, images_dir, masks_dir):
 
-                full_image_path = os.path.join(self.raw_images, image)
-                full_label_path = os.path.join(self.raw_labels, matching_label)
-                # Check if pathes are valid
+        # Store the DIRECTORY paths themselves
+        self.images_dir = images_dir
+        self.masks_dir = masks_dir
+
+        # Store the list of FILENAMES
+        self.image_filenames = os.listdir(images_dir)
+        self.mask_filenames = os.listdir(masks_dir)
+
+        self.pair_sorted_data = []
+
+    # Make pairs of an image and it's corresponding mask
+    def sort_data(self):
+        self.pair_sorted_data = []
+        dict_of_masks = {os.path.splitext(f)[0]: f for f in self.mask_filenames}
+        for img in self.image_filenames:
+            image_stem = os.path.splitext(img)[0]
+
+            if image_stem in dict_of_masks:
+                matching_mask = dict_of_masks[image_stem]
+
+                full_image_path = os.path.join(self.images_dir, img)
+                full_mask_path = os.path.join(self.masks_dir, matching_mask)
+
                 if (
                     os.path.getsize(full_image_path) > 0
-                    and os.path.getsize(full_label_path) > 0
+                    and os.path.getsize(full_mask_path) > 0
                 ):
-                    self.data_pairs.append((full_image_path, full_label_path))
+                    self.pair_sorted_data.append((full_image_path, full_mask_path))
+
                 else:
-                    print(f"Skipping corrupted file: {image}")
+                    logger.warning(f"Skipping corrupted file: {img}")
 
-                self.data_pairs.append((full_image_path, full_label_path))
+    def get_sorted_data(self):
+        return self.pair_sorted_data
 
-    def get_data(self):
-        return self.data_pairs
+
+func = DataIngestor("../data/tiff/train", "../data/tiff/train_labels")
+func.sort_data()
+result = func.get_sorted_data()
+print(len(result))
