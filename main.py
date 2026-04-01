@@ -1,65 +1,88 @@
-import os
-from pathlib import Path
+"""Small project entrypoint.
 
-import torch
+This file lets you launch the two task families from one place while keeping
+the real logic inside `src/segmentation` and `src/change_detection`.
+"""
 
-os.environ["OPENCV_LOG_LEVEL"] = "FATAL"
+from __future__ import annotations
 
-from torch.utils.data import DataLoader
-from torch.utils.data import random_split
+import argparse
 
-from pipeline.dataset import GeoSynthDataset
-from pipeline.ingest import DataIngestor
-from pipeline.train import train_one_epoch, model, optimizer, criterion, device
-from pipeline.transform import DataTransformer
-from visualize import save_prediction
+from src.change_detection.predict import run_change_detection_prediction
+from src.change_detection.train import run_change_detection_training
+from src.segmentation.predict import run_segmentation_prediction
+from src.segmentation.train import run_segmentation_training
 
-BASE_DIR = Path(__file__).resolve().parent
-TRAIN_IMAGES_DIR = BASE_DIR / "data" / "tiff" / "train"
-TRAIN_LABELS_DIR = BASE_DIR / "data" / "tiff" / "train_labels"
 
-# Get the data
-dataset_ingestor = DataIngestor(TRAIN_IMAGES_DIR, TRAIN_LABELS_DIR)
-dataset_ingestor.make_pairs()
-paired_data = dataset_ingestor.get_data()
+def parse_args() -> argparse.Namespace:
+    """Parse a tiny CLI for the whole project."""
 
-# Set up settings
-transformer = DataTransformer(resized_images=(512, 512))
+    parser = argparse.ArgumentParser(description="GeoSynth multi-task runner.")
+    parser.add_argument("task_family", choices=["segmentation", "change_detection"])
+    parser.add_argument("mode", choices=["train", "predict"])
+    parser.add_argument("--dataset", default=None)
+    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--batch-size", type=int, default=2)
+    parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--image-size", type=int, default=256)
+    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--val-ratio", type=float, default=0.2)
+    parser.add_argument("--count", type=int, default=3)
+    parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--augment", action="store_true")
+    return parser.parse_args()
 
-# Run the dataset and check whether everything worked
-my_dataset = GeoSynthDataset(data_pairs=paired_data, transformer=transformer)
-# if len(my_dataset) > 0:
-#     print(f"Success! Found {len(my_dataset)} pairs.")
 
-#     sample_img, sample_mask = my_dataset[0]
+def main() -> None:
+    """Route the command to the correct task family."""
 
-#     print(f"Image Tensor Shape: {sample_img.shape}")  # Should be (3, 512, 512)
-#     print(f"Mask Tensor Shape: {sample_mask.shape}")  # Should be (1, 512, 512)
-#     print(f"Image Max Value: {sample_img.max()}")  # Should be 1.0
-# else:
-#     print("No pairs found.")
+    arguments = parse_args()
 
-train_loader = DataLoader(
-    my_dataset,
-    batch_size=4,  # 4 images at a time
-    shuffle=True,
-    num_workers=2,  # Uses my Arch CPU to prep data in parallel
-)
-# I broke down files into two parts for training and for validation
-train_size = int(0.8 * len(my_dataset))
-val_size = len(my_dataset) - train_size
-train_dataset, val_dataset = random_split(my_dataset, [train_size, val_size])
+    if arguments.task_family == "segmentation" and arguments.mode == "train":
+        run_segmentation_training(
+            dataset_name=arguments.dataset or "roads",
+            epochs=arguments.epochs,
+            batch_size=arguments.batch_size,
+            learning_rate=arguments.learning_rate,
+            image_size=(arguments.image_size, arguments.image_size),
+            num_workers=arguments.num_workers,
+            val_ratio=arguments.val_ratio,
+            use_augmentation=arguments.augment,
+        )
+        return
 
-# Created two loaders for training data and for validating the model
-train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False)
+    if arguments.task_family == "segmentation" and arguments.mode == "predict":
+        run_segmentation_prediction(
+            dataset_name=arguments.dataset or "roads",
+            checkpoint_path=arguments.checkpoint,
+            image_size=(arguments.image_size, arguments.image_size),
+            output_count=arguments.count,
+        )
+        return
 
-# Run for 10 'Eras' (Epochs)
-for epoch in range(10):
-    avg_loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
-    print(f"Epoch {epoch+1} complete. Average Loss: {avg_loss:.4f}")
+    if arguments.task_family == "change_detection" and arguments.mode == "train":
+        run_change_detection_training(
+            dataset_name=arguments.dataset or "changes",
+            epochs=arguments.epochs,
+            batch_size=arguments.batch_size,
+            learning_rate=arguments.learning_rate,
+            image_size=(arguments.image_size, arguments.image_size),
+            num_workers=arguments.num_workers,
+            val_ratio=arguments.val_ratio,
+            use_augmentation=arguments.augment,
+        )
+        return
 
-for i in range(3):
-    save_prediction(model, val_dataset, i, device, filename=f"val_result_{i}.png")
-torch.save(model.state_dict(), "geosynth_roads.pth")
-print("Model weights saved to geosynth_roads.pth")
+    if arguments.task_family == "change_detection" and arguments.mode == "predict":
+        run_change_detection_prediction(
+            dataset_name=arguments.dataset or "changes",
+            checkpoint_path=arguments.checkpoint,
+            image_size=(arguments.image_size, arguments.image_size),
+            output_count=arguments.count,
+        )
+        return
+
+
+if __name__ == "__main__":
+    main()
+
