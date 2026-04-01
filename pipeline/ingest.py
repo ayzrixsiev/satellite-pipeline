@@ -48,8 +48,8 @@ class DataIngestor:
     def get_sorted_data(self):
         return self.pair_sorted_data
 
+    def make_pairs(self):
+        self.sort_data()
 
-func = DataIngestor("../data/tiff/train", "../data/tiff/train_labels")
-func.sort_data()
-result = func.get_sorted_data()
-print(len(result))
+    def get_data(self):
+        return self.get_sorted_data()

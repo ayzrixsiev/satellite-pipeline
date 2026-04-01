@@ -1,7 +1,0 @@
-__pycache__/
-*.pyc
-*.pth
-data/
-result.png
-.codex
-.venv/

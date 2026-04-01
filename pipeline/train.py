@@ -16,7 +16,7 @@ model.to(device)
 # Set up the "Judge". How wrong am i?
 criterion = torch.nn.BCEWithLogitsLoss()
 
-# Set up the "Teacher". How to fix my mistakes? We use Adam because it is
+# Set up the "Teacher". How to fix my mistakes? We use Adam
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 print(f"Model is loaded on: {device}")
@@ -45,5 +45,5 @@ def train_one_epoch(model, loader, optimizer, criterian, device):
         # All the mistake scores
         epoch_loss += loss.item()
 
-        # Find how wrong was the model in percentages
-        return epoch_loss / len(loader)
+    # Find how wrong was the model in percentages
+    return epoch_loss / len(loader)
