@@ -1,13 +1,13 @@
-# Project
-System that ingests a dataset with satelite and drone taken images to detect a roards. It runs a whole pipeline to clean and creates one format, comfortable to feed and train machine learning model which will, then, detect roads automatically and showcase the results
+# Project GeoSythn
+System that ingests a dataset with satelite and drone taken images to detect a roards, diff water and land and find change over time in the images. It runs a whole pipeline to clean and creates one format, comfortable to feed and train machine learning model which will, then, detect roads automatically and showcase the results
 
 ## Libraries and their roles in my system
-1. torch & torchvision - the engine: These will use your GTX 1650 to do the heavy lifting
-2. numpy - the translator: Converts raw images into numerical matrices
-3. opencv-python - the vision: Handles reading .tiff files and drawing the road masks
-4. segmentation-models-pytorch - the architect: Provides the U-Net architecture so we don't reinvent the wheel
+1. torch & torchvision - the engine: these will use your GTX 1650 to do the heavy lifting
+2. numpy - the translator: converts raw images into numerical matrices
+3. opencv-python - the vision: handles reading files
+4. segmentation-models-pytorch - the architect: provides the U-Net architecture (ML model)
 5. pydantic - the validator: Ensures that if you drop in a new dataset, it matches the required format/schema (size, channels, etc.)
-7. albumentations - the augmentor: Automatically flips/rotates images to make the model smarter
+7. albumentations - the augmentor: automatically flips/rotates images to make the model smarter
 
 ## High level design and overview
 1. Ingest - read the data using opencv
@@ -19,22 +19,9 @@ System that ingests a dataset with satelite and drone taken images to detect a r
 1. uv - extremely fast python manager written in rust
 2. uvicorn+starlette - server for fastapi
 
-## Work to do and outcomes
-- We need to see how our data looks like in the first place. What size images are? Are they grayscale (0-255) or they binary (0, 1). Our images are 1500 by 1500 which is high resolution for my machine, our mask data has only black and white colors, which is very comfortable
 
-- We need to cut those big images into 512x512 pieces to work with them, meaning once we ingest we need to start cutting them and store and then normilize by dividing it by 255.
+## Work done, outcomes and what i have learned
 
-- I have DataIngester that knows where are the files and makes them comfortable to access and DataTransformer that knows how to clean them and prepare for training. Now i need Pytorch Dataset which will be like a container that will automate the ingestion and transformation.
+- Ingesting datasets, we have two DataIngestors - for segmenation and for change detection datasets. Three datasets: for road detection, for water-land detection, for change detection. We validate pathes, then we pair images (image and it's mask) using "stem", we split the dataset into two parts (if it is not split) for training and validation (usually 20 val and 80 train).
 
-- Set up ML model U net and DataLoader to orchestrate the process.
-
-
-
-## Knowledge
-Grayscale: Reducing 3 color channels (Red, Green, Blue) into 1 channel (Brightness).
-Normalization: Changing the range of the numbers.
-
-Normalixation of the images - by default OpenCV loads images in 0-255 range, but neural networks does not like it, because if we do for example multiplication, we end up with a huge number, we also need a precision for calculation (meaning float number). So what do we do? Divide pixels by 255:
-255/255 = 1 White
-0/255 = 0 Black
-127/255 = 0.5 Gray
+- Transform datasets, we process images and masks by making them same size, opencv loads images with bgr we make it rgb, we make sure masks are grayscale and their range values bigger (basically masks are usually 1 white roi and 0 black, and we make this 1 be 255 to be able to see it visually), we also make sure masks and images are the same size. I have added an option of augmentation - this is a technique used to flip an images, so that ai does not just remembers the images, but actually can detect roads from any angle in the images. And then we orchestrate all the _files in two callable functions.

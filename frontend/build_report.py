@@ -1,316 +1,275 @@
-"""Build the browser report data from the current project state.
+"""
+build_report.py
 
-The frontend itself is static HTML/CSS/JS, which is great for screenshots and
-easy sharing. This script prepares one JavaScript file that contains:
-- dataset counts
-- experiment metrics from JSON histories
-- image paths for prediction panels
-- project summary text for the report page
+This script reads the current project state from disk and writes one browser
+data bundle to `frontend/report-data.js`.
 
-You can rerun this script any time after training to refresh the page data.
+The frontend expects a public dashboard-oriented shape:
+- compact KPI values
+- dataset registry rows
+- chart series for histories
+- latest metric snapshot
+- featured qualitative panels
+- system registry entries
 """
 
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 import sys
+from datetime import datetime
 
 
-# The script lives in `frontend/`, so two parents up lands at the repo root.
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+OUTPUT_JS = REPO_ROOT / "frontend" / "report-data.js"
+OUTPUTS_ROOT = REPO_ROOT / "outputs"
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from data.pipeline.ingest import ChangeDetectionIngestor, SegmentationIngestor
 
 
-def _load_history(history_path: Path) -> list[dict]:
-    """Load one metrics history file if it exists, otherwise return an empty list."""
+SUPPORTED_ARTIFACT_SUFFIXES = {".png", ".jpg", ".jpeg", ".pt", ".pth", ".json", ".csv"}
 
-    if not history_path.exists():
+
+def _read_json(path: Path):
+    """Return parsed JSON, or an empty structure when the file is missing."""
+
+    if not path.exists():
         return []
-
-    return json.loads(history_path.read_text(encoding="utf-8"))
-
-
-def _relative_to_frontend(path: Path) -> str:
-    """Convert a project path into a path that works from `frontend/index.html`."""
-
-    return str(path.relative_to(PROJECT_ROOT)).replace("\\", "/")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _count_existing(paths: list[Path]) -> int:
-    """Count how many files from a list actually exist on disk."""
+def _latest_metric(history: list[dict], key: str, default: float = 0.0) -> float:
+    """Pick the latest value of one metric from an epoch history list."""
 
-    return sum(1 for path in paths if path.exists())
+    if not history:
+        return default
+    value = history[-1].get(key, default)
+    return float(value)
 
 
-def _dataset_inventory() -> dict:
-    """Collect dataset counts from the real folders on disk."""
+def _series_from_epoch_history(history: list[dict], key: str) -> list[float]:
+    """Convert a list of epoch dictionaries into a single chart-ready series."""
+
+    return [float(epoch.get(key, 0.0)) for epoch in history]
+
+
+def _normalize_history(raw_history) -> dict[str, list[float]]:
+    """Support both saved formats: list-of-epochs or dict-of-arrays."""
+
+    if isinstance(raw_history, list):
+        return {
+            "train_loss": _series_from_epoch_history(raw_history, "train_loss"),
+            "val_loss": _series_from_epoch_history(raw_history, "val_loss"),
+            "train_dice": _series_from_epoch_history(raw_history, "train_dice"),
+            "val_dice": _series_from_epoch_history(raw_history, "val_dice"),
+            "epoch_rows": raw_history,
+        }
+
+    if isinstance(raw_history, dict):
+        return {
+            "train_loss": list(raw_history.get("train_loss", raw_history.get("loss", []))),
+            "val_loss": list(raw_history.get("val_loss", [])),
+            "train_dice": list(raw_history.get("train_dice", raw_history.get("dice", []))),
+            "val_dice": list(raw_history.get("val_dice", [])),
+            "epoch_rows": [],
+        }
+
+    return {
+        "train_loss": [],
+        "val_loss": [],
+        "train_dice": [],
+        "val_dice": [],
+        "epoch_rows": [],
+    }
+
+
+def _dataset_rows() -> list[dict]:
+    """Build the exact dataset counts the backend actually uses."""
 
     roads_ingestor = SegmentationIngestor(
-        train_images_dir=PROJECT_ROOT / "dataset" / "roads" / "train",
-        train_masks_dir=PROJECT_ROOT / "dataset" / "roads" / "train_labels",
-        val_images_dir=PROJECT_ROOT / "dataset" / "roads" / "val",
-        val_masks_dir=PROJECT_ROOT / "dataset" / "roads" / "val_labels",
+        train_images_dir=REPO_ROOT / "dataset" / "roads" / "train",
+        train_masks_dir=REPO_ROOT / "dataset" / "roads" / "train_labels",
+        val_images_dir=REPO_ROOT / "dataset" / "roads" / "val",
+        val_masks_dir=REPO_ROOT / "dataset" / "roads" / "val_labels",
         split_seed=42,
     )
     roads_train, roads_val = roads_ingestor.build_splits()
 
     water_ingestor = SegmentationIngestor(
-        train_images_dir=PROJECT_ROOT / "dataset" / "water_land" / "train",
-        train_masks_dir=PROJECT_ROOT / "dataset" / "water_land" / "train_labels",
+        train_images_dir=REPO_ROOT / "dataset" / "water_land" / "train",
+        train_masks_dir=REPO_ROOT / "dataset" / "water_land" / "train_labels",
         split_seed=42,
     )
     water_train, water_val = water_ingestor.build_splits(val_ratio=0.2)
 
     change_ingestor = ChangeDetectionIngestor(
-        train_image1_dir=PROJECT_ROOT / "dataset" / "changes" / "image1",
-        train_image2_dir=PROJECT_ROOT / "dataset" / "changes" / "image2",
-        train_masks_dir=PROJECT_ROOT / "dataset" / "changes" / "mask",
+        train_image1_dir=REPO_ROOT / "dataset" / "changes" / "image1",
+        train_image2_dir=REPO_ROOT / "dataset" / "changes" / "image2",
+        train_masks_dir=REPO_ROOT / "dataset" / "changes" / "mask",
         split_seed=42,
     )
     change_train, change_val = change_ingestor.build_splits(val_ratio=0.2)
 
-    return {
-        "roads": {
-            "title": "Road Detection",
-            "status": "Baseline trained",
-            "train_samples": len(roads_train),
-            "val_samples": len(roads_val),
-            "notes": "GeoTIFF roads dataset with explicit validation split.",
-        },
-        "water_land": {
-            "title": "Land vs Water",
-            "status": "Dataset integrated",
-            "train_samples": len(water_train),
-            "val_samples": len(water_val),
-            "notes": "Masks are JPEG files, so the backend binarizes them defensively.",
-        },
-        "changes": {
-            "title": "Change Detection",
-            "status": "Baseline trained",
-            "train_samples": len(change_train),
-            "val_samples": len(change_val),
-            "notes": "Paired `image1/image2/mask` dataset using a 6-channel input baseline.",
-        },
+    return [
+        {"name": "roads", "train": len(roads_train), "val": len(roads_val), "status": "READY"},
+        {"name": "water_land", "train": len(water_train), "val": len(water_val), "status": "READY"},
+        {"name": "changes", "train": len(change_train), "val": len(change_val), "status": "READY"},
+    ]
+
+
+def _list_prediction_images(task_name: str, prefix: str) -> list[str]:
+    """Return browser-friendly relative paths for saved preview panels."""
+
+    folder = OUTPUTS_ROOT / "predictions" / task_name
+    if not folder.exists():
+        return []
+
+    files = sorted(
+        path.name
+        for path in folder.iterdir()
+        if path.is_file() and path.name.startswith(prefix) and path.suffix.lower() == ".png"
+    )
+    return [f"../outputs/predictions/{task_name}/{file_name}" for file_name in files]
+
+
+def _count_artifacts(folder: Path) -> int:
+    """Count saved reports, checkpoints, and images in outputs."""
+
+    if not folder.exists():
+        return 0
+
+    total = 0
+    for path in folder.rglob("*"):
+        if path.is_file() and path.suffix.lower() in SUPPORTED_ARTIFACT_SUFFIXES:
+            total += 1
+    return total
+
+
+def _checkpoint_names() -> list[str]:
+    """List the current checkpoint files for registry display."""
+
+    checkpoint_dir = OUTPUTS_ROOT / "checkpoints"
+    if not checkpoint_dir.exists():
+        return []
+
+    return sorted(path.name for path in checkpoint_dir.iterdir() if path.suffix.lower() in {".pt", ".pth"})
+
+
+def _checkpoint_by_prefix(prefix: str) -> str:
+    """Find the first checkpoint file that starts with a known task prefix."""
+
+    for name in _checkpoint_names():
+        if name.startswith(prefix):
+            return name
+    return "not found"
+
+
+def build_report() -> dict:
+    """Build the final payload consumed by the static frontend."""
+
+    dataset_rows = _dataset_rows()
+    total_samples = sum(dataset["train"] + dataset["val"] for dataset in dataset_rows)
+
+    raw_roads_history = _read_json(OUTPUTS_ROOT / "reports" / "roads_history.json")
+    raw_changes_history = _read_json(OUTPUTS_ROOT / "reports" / "changes_change_history.json")
+
+    roads_history = _normalize_history(raw_roads_history)
+    changes_history = _normalize_history(raw_changes_history)
+
+    roads_metrics = {
+        "epochs": len(roads_history["val_loss"]) or len(roads_history["train_loss"]),
+        "val_loss": _latest_metric(roads_history["epoch_rows"], "val_loss", roads_history["val_loss"][-1] if roads_history["val_loss"] else 0.0),
+        "val_iou": _latest_metric(roads_history["epoch_rows"], "val_iou", 0.0),
+        "val_dice": _latest_metric(roads_history["epoch_rows"], "val_dice", roads_history["val_dice"][-1] if roads_history["val_dice"] else 0.0),
+        "val_precision": _latest_metric(roads_history["epoch_rows"], "val_precision", 0.0),
+        "val_recall": _latest_metric(roads_history["epoch_rows"], "val_recall", 0.0),
     }
 
+    changes_metrics = {
+        "epochs": len(changes_history["val_loss"]) or len(changes_history["train_loss"]),
+        "val_loss": _latest_metric(changes_history["epoch_rows"], "val_loss", changes_history["val_loss"][-1] if changes_history["val_loss"] else 0.0),
+        "val_iou": _latest_metric(changes_history["epoch_rows"], "val_iou", 0.0),
+        "val_dice": _latest_metric(changes_history["epoch_rows"], "val_dice", changes_history["val_dice"][-1] if changes_history["val_dice"] else 0.0),
+        "val_precision": _latest_metric(changes_history["epoch_rows"], "val_precision", 0.0),
+        "val_recall": _latest_metric(changes_history["epoch_rows"], "val_recall", 0.0),
+    }
 
-def _experiment_cards() -> list[dict]:
-    """Create the high-level report cards shown at the top of the webpage."""
+    road_previews = _list_prediction_images("roads", "roads_preview")
+    change_previews = _list_prediction_images("changes", "changes_preview")
 
-    roads_history = _load_history(PROJECT_ROOT / "outputs" / "reports" / "roads_history.json")
-    changes_history = _load_history(PROJECT_ROOT / "outputs" / "reports" / "changes_change_history.json")
-    inventory = _dataset_inventory()
-    total_samples = sum(item["train_samples"] + item["val_samples"] for item in inventory.values())
+    checkpoint_names = _checkpoint_names()
+    checkpoint_count = len(checkpoint_names)
+    artifact_count = _count_artifacts(OUTPUTS_ROOT)
+    preview_count = len(road_previews) + len(change_previews)
 
-    artifact_paths = [
-        PROJECT_ROOT / "outputs" / "reports" / "roads_history.json",
-        PROJECT_ROOT / "outputs" / "reports" / "changes_change_history.json",
-        PROJECT_ROOT / "outputs" / "checkpoints" / "roads_best.pth",
-        PROJECT_ROOT / "outputs" / "checkpoints" / "changes_change_best.pth",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_1.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_2.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_prediction_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_preview_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_preview_1.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_prediction_0.png",
-    ]
-
-    return [
-        {
-            "label": "Supported task families",
-            "value": "2",
-            "detail": "Segmentation and paired-image change detection",
-        },
-        {
-            "label": "Integrated datasets",
-            "value": "3",
-            "detail": "Roads, land/water, and change detection",
-        },
-        {
-            "label": "Labeled samples tracked",
-            "value": f"{total_samples}",
-            "detail": "Train and validation samples across all wired datasets",
-        },
-        {
-            "label": "Saved report artifacts",
-            "value": f"{_count_existing(artifact_paths)}",
-            "detail": "Histories, checkpoints, and qualitative prediction panels",
-        },
-        {
-            "label": "Baseline runs completed",
-            "value": str(sum(1 for history in [roads_history, changes_history] if history)),
-            "detail": "Road detection and change detection both have working training histories",
-        },
-        {
-            "label": "Prediction panels linked",
-            "value": str(len(_gallery_items())),
-            "detail": "Visual outputs are already connected to the browser report gallery",
-        },
-    ]
-
-
-def _gallery_items() -> list[dict]:
-    """Collect qualitative prediction panels for the report gallery."""
-
-    gallery_paths = [
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_1.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_preview_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_prediction_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_prediction_0.png",
-    ]
-
-    items: list[dict] = []
-    for path in gallery_paths:
-        if not path.exists():
-            continue
-
-        task_name = "Change Detection" if "changes" in path.parts else "Road Detection"
-        items.append(
-            {
-                "title": path.stem.replace("_", " ").title(),
-                "task": task_name,
-                "image": f"../{_relative_to_frontend(path)}",
-            }
-        )
-
-    return items
-
-
-def _artifact_inventory() -> list[dict]:
-    """Summarize the concrete files produced by the backend so far."""
-
-    reports = [
-        PROJECT_ROOT / "outputs" / "reports" / "roads_history.json",
-        PROJECT_ROOT / "outputs" / "reports" / "changes_change_history.json",
-    ]
-    checkpoints = [
-        PROJECT_ROOT / "outputs" / "checkpoints" / "roads_best.pth",
-        PROJECT_ROOT / "outputs" / "checkpoints" / "changes_change_best.pth",
-    ]
-    previews = [
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_1.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_preview_2.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "roads" / "roads_prediction_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_preview_0.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_preview_1.png",
-        PROJECT_ROOT / "outputs" / "predictions" / "changes" / "changes_prediction_0.png",
-    ]
-
-    return [
-        {
-            "title": "Metric histories",
-            "value": str(_count_existing(reports)),
-            "detail": "JSON files saved after training runs and used directly by the frontend charts.",
-        },
-        {
-            "title": "Model checkpoints",
-            "value": str(_count_existing(checkpoints)),
-            "detail": "Reusable trained weights for road segmentation and change detection baselines.",
-        },
-        {
-            "title": "Qualitative panels",
-            "value": str(_count_existing(previews)),
-            "detail": "Saved prediction images for visual comparison in the gallery section.",
-        },
-    ]
-
-
-def build_report_payload() -> dict:
-    """Create the full payload consumed by the frontend JavaScript."""
-
-    roads_history = _load_history(PROJECT_ROOT / "outputs" / "reports" / "roads_history.json")
-    changes_history = _load_history(PROJECT_ROOT / "outputs" / "reports" / "changes_change_history.json")
+    generated = datetime.now().isoformat(timespec="seconds")
 
     return {
-        "project": {
-            "title": "GeoSynth Mission Report",
-            "subtitle": "Remote-sensing computer vision system for segmentation and change detection",
-            "summary": (
-                "This report page summarizes the current backend for GeoSynth: "
-                "a reusable pipeline that ingests datasets, preprocesses imagery, "
-                "trains baseline models, and exports prediction panels ready for a future frontend."
-            ),
-            "mentor_pitch": (
-                "The project is already beyond a notebook prototype. It supports multiple "
-                "dataset families, task-specific training entrypoints, reusable preprocessing, "
-                "model checkpointing, metrics export, and polished qualitative outputs. "
-                "The current scores are early baselines, but the engineering foundation is ready for iteration."
-            ),
-            "generated_on": datetime.now().astimezone().strftime("%B %d, %Y at %H:%M"),
+        "generated": generated,
+        "kpi": {
+            "task_families": 2,
+            "datasets": len(dataset_rows),
+            "tracked_samples": total_samples,
+            "checkpoints": checkpoint_count,
+            "preview_panels": preview_count,
+            "artifacts": artifact_count,
         },
-        "report_cards": _experiment_cards(),
-        "inventory": _dataset_inventory(),
-        "artifacts": _artifact_inventory(),
+        "datasets": dataset_rows,
         "histories": {
-            "roads": roads_history,
-            "changes": changes_history,
+            "roads": {
+                "train_loss": roads_history["train_loss"],
+                "val_loss": roads_history["val_loss"],
+                "train_dice": roads_history["train_dice"],
+                "val_dice": roads_history["val_dice"],
+            },
+            "changes": {
+                "train_loss": changes_history["train_loss"],
+                "val_loss": changes_history["val_loss"],
+                "train_dice": changes_history["train_dice"],
+                "val_dice": changes_history["val_dice"],
+            },
         },
-        "gallery": _gallery_items(),
-        "pipeline_steps": [
-            {
-                "title": "1. Ingest",
-                "body": "Pair segmentation images with masks or pair change-detection image1/image2/mask triplets by filename stem.",
-            },
-            {
-                "title": "2. Transform",
-                "body": "Load TIFF, PNG, and JPEG files, binarize masks safely, resize inputs, normalize tensors, and apply synchronized augmentations.",
-            },
-            {
-                "title": "3. Train",
-                "body": "Build task-specific dataloaders, run epoch loops, compute losses and metrics, and save the best checkpoint.",
-            },
-            {
-                "title": "4. Evaluate",
-                "body": "Track validation IoU and Dice over time and export machine-readable history files for later reporting.",
-            },
-            {
-                "title": "5. Showcase",
-                "body": "Save visual comparison panels and surface them in a browser-ready report page for mentor updates and demos.",
-            },
-        ],
-        "achievements": [
-            "Built a generic segmentation ingestor for both road and land/water datasets.",
-            "Built a dedicated change-detection ingestor for paired temporal imagery.",
-            "Implemented one shared preprocessing pipeline that handles TIFF, PNG, and JPEG masks safely.",
-            "Added reusable training utilities for device selection, dataloaders, metrics, and checkpoints.",
-            "Trained working baseline models for road segmentation and change detection.",
-            "Exported qualitative prediction panels to support rapid visual review.",
-        ],
-        "next_steps": [
-            "Train the water-vs-land benchmark and add its metrics to the dashboard.",
-            "Improve the road baseline with more epochs, tuned class weighting, and stronger augmentation.",
-            "Replace OpenCV-only TIFF loading with a GeoTIFF-aware reader for cleaner remote-sensing support.",
-            "Add a lightweight browser UI for selecting tasks, images, and prediction runs interactively.",
-        ],
-        "run_commands": [
-            "./.venv/bin/python main.py segmentation train --dataset roads --epochs 5 --image-size 256",
-            "./.venv/bin/python main.py segmentation train --dataset water_land --epochs 5 --image-size 256",
-            "./.venv/bin/python main.py change_detection train --dataset changes --epochs 8 --image-size 256",
+        "metrics": {
+            "roads": roads_metrics,
+            "changes": changes_metrics,
+        },
+        "predictions": {
+            "roads": road_previews,
+            "changes": change_previews,
+        },
+        "registry": [
+            {"key": "Platform", "val": "GeoSynth", "sub": "remote sensing dashboard"},
+            {"key": "Task Modes", "val": "Segmentation + Change", "sub": "shared backend"},
+            {"key": "Road Checkpoint", "val": _checkpoint_by_prefix("roads"), "sub": "current best file"},
+            {"key": "Change Checkpoint", "val": _checkpoint_by_prefix("changes"), "sub": "current best file"},
+            {"key": "Prediction Panels", "val": str(preview_count), "sub": "saved qualitative outputs"},
+            {"key": "Histories", "val": "2", "sub": "roads and changes"},
+            {"key": "Generated", "val": generated.replace("T", " "), "sub": "build_report.py"},
+            {"key": "Serving", "val": "frontend/", "sub": "static local page"},
         ],
     }
 
 
 def main() -> None:
-    """Write the payload as a small JavaScript file used by the browser page."""
+    """Write the JS data bundle used by the browser dashboard."""
 
-    payload = build_report_payload()
-    output_path = PROJECT_ROOT / "frontend" / "report-data.js"
-
-    # Using a JS assignment instead of JSON fetch keeps the page easy to open
-    # from a simple local server without any API layer.
-    output_path.write_text(
-        "window.GEOSYNTH_REPORT = " + json.dumps(payload, indent=2) + ";\n",
-        encoding="utf-8",
+    report = build_report()
+    js_content = (
+        "// Auto-generated by frontend/build_report.py. Rebuild instead of editing.\n"
+        "window.GEOSYNTH_REPORT = "
+        + json.dumps(report, indent=2)
+        + ";\n"
     )
-    print(f"Report data written to {output_path}")
+    OUTPUT_JS.write_text(js_content, encoding="utf-8")
+
+    print(f"[ OK ] report-data.js written to: {OUTPUT_JS}")
+    print(f"       Tracked samples: {report['kpi']['tracked_samples']}")
+    print(f"       Checkpoints: {report['kpi']['checkpoints']}")
+    print(f"       Preview panels: {report['kpi']['preview_panels']}")
 
 
 if __name__ == "__main__":

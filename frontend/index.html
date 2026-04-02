@@ -1,161 +1,219 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GeoSynth Report</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <main class="shell">
-      <section class="hero">
-        <p class="eyebrow">Remote Sensing Report</p>
-        <div class="hero-meta" id="generated-on"></div>
-        <h1 id="page-title">GeoSynth Mission Report</h1>
-        <p id="page-subtitle" class="hero-subtitle"></p>
-        <p id="page-summary" class="hero-summary"></p>
-        <div class="mentor-note" id="mentor-pitch"></div>
-      </section>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoSynth</title>
+  <link rel="stylesheet" href="styles.css?v=5">
+</head>
+<body>
 
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>What Exists Today</h2>
-            <p>
-              The cards below summarize the current working scope of the project:
-              reusable data pipelines, multiple task families, exported metrics,
-              and qualitative outputs ready for review.
-            </p>
+  <header class="site-header">
+    <div class="header-left">
+      <div class="logo-block">
+        <span class="logo-mark">GS</span>
+        <div>
+          <div class="brand-name">GeoSynth</div>
+          <div class="brand-sub">Remote Sensing Intelligence</div>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-chip"><span class="dot"></span>SYSTEM ONLINE</div>
+      <div class="header-ts" id="report-ts">--</div>
+    </div>
+  </header>
+
+  <main class="page-content">
+
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-val" id="k-tasks">--</div>
+        <div class="kpi-lbl">Task Families</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" id="k-datasets">--</div>
+        <div class="kpi-lbl">Datasets</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" id="k-samples">--</div>
+        <div class="kpi-lbl">Tracked Samples</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" id="k-checkpoints">--</div>
+        <div class="kpi-lbl">Checkpoints</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" id="k-panels">--</div>
+        <div class="kpi-lbl">Preview Panels</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val" id="k-artifacts">--</div>
+        <div class="kpi-lbl">Artifacts</div>
+      </div>
+    </div>
+
+    <div class="two-col-grid">
+      <div class="left-col">
+
+        <div class="panel chart-panel">
+          <div class="panel-hd">
+            <span class="panel-title">Road Detection &mdash; Loss</span>
+            <span class="panel-badge">Train / Val</span>
           </div>
-        </div>
-        <div class="stat-grid" id="stat-grid"></div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>System Flow</h2>
-            <p>
-              This is the current shape of the platform: one reusable pipeline
-              that can support segmentation and change-detection datasets
-              without turning the project into a pile of one-off scripts.
-            </p>
+          <div class="canvas-wrap">
+            <canvas id="c-road-loss"></canvas>
           </div>
-        </div>
-        <div class="pipeline-grid" id="pipeline-grid"></div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>Dataset Inventory</h2>
-            <p>
-              These counts come from the actual datasets wired into the backend,
-              not hardcoded placeholders.
-            </p>
+          <div class="legend-row">
+            <span class="leg-item"><span class="swatch sw-dark"></span>Train Loss</span>
+            <span class="leg-item"><span class="swatch sw-mid"></span>Val Loss</span>
           </div>
+          <div class="mini-stat-grid" id="road-stat-grid"></div>
         </div>
-        <div class="inventory-grid" id="inventory-grid"></div>
-      </section>
 
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>Produced Artifacts</h2>
-            <p>
-              These numbers show what the backend has already exported and made
-              available to the browser report.
-            </p>
+        <div class="panel chart-panel">
+          <div class="panel-hd">
+            <span class="panel-title">Change Detection &mdash; Dice</span>
+            <span class="panel-badge">Train / Val</span>
           </div>
-        </div>
-        <div class="stat-grid" id="artifact-grid"></div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>Training Signals</h2>
-            <p>
-              The charts show baseline metrics from the current JSON history
-              files. As you run longer experiments, the same page will become
-              more informative automatically.
-            </p>
+          <div class="canvas-wrap">
+            <canvas id="c-change-dice"></canvas>
           </div>
-        </div>
-        <div class="chart-grid">
-          <article class="chart-card">
-            <h3>Road Detection Loss</h3>
-            <p>Training and validation loss from the road segmentation baseline.</p>
-            <canvas id="roads-chart"></canvas>
-          </article>
-          <article class="chart-card">
-            <h3>Change Detection Dice</h3>
-            <p>Training and validation Dice trends for the paired-image baseline.</p>
-            <canvas id="changes-chart"></canvas>
-          </article>
-          <article class="chart-card">
-            <h3>Dataset Size Comparison</h3>
-            <p>Total train + validation samples across the currently integrated tasks.</p>
-            <canvas id="inventory-chart"></canvas>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>Qualitative Results</h2>
-            <p>
-              These preview panels are generated by the backend and saved during
-              training and prediction runs. They are meant for human inspection,
-              not just for model scoring.
-            </p>
+          <div class="legend-row">
+            <span class="leg-item"><span class="swatch sw-dark"></span>Train Dice</span>
+            <span class="leg-item"><span class="swatch sw-mid"></span>Val Dice</span>
           </div>
+          <div class="mini-stat-grid" id="change-stat-grid"></div>
         </div>
-        <div class="gallery-grid" id="gallery-grid"></div>
-      </section>
 
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>Mentor Report</h2>
-            <p>
-              This section is written to be screenshot-friendly and easy to
-              summarize in an update message.
-            </p>
+      </div>
+      <div class="right-col">
+
+        <div class="panel chart-panel">
+          <div class="panel-hd">
+            <span class="panel-title">Dataset Volume</span>
+            <span class="panel-badge">by Split</span>
           </div>
-        </div>
-        <div class="report-grid">
-          <article class="report-card">
-            <h3>What Has Been Achieved</h3>
-            <ul id="achievements-list"></ul>
-          </article>
-          <article class="report-card">
-            <h3>Next Steps</h3>
-            <ul id="next-steps-list"></ul>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <div>
-            <h2>How To Reproduce</h2>
-            <p>
-              These are the current commands used to run the backend experiments.
-            </p>
+          <div class="canvas-wrap">
+            <canvas id="c-ds-volume"></canvas>
           </div>
+          <div class="legend-row">
+            <span class="leg-item"><span class="swatch sw-dark"></span>Train</span>
+            <span class="leg-item"><span class="swatch sw-mid"></span>Val</span>
+          </div>
+          <div class="mini-stat-grid" id="volume-stat-grid"></div>
         </div>
-        <div class="command-list" id="command-list"></div>
-      </section>
 
-      <p class="footer-note">
-        GeoSynth is currently a backend-first remote-sensing system. The next
-        layer is an interactive browser UI on top of these same outputs.
-      </p>
-    </main>
+        <div class="panel chart-panel">
+          <div class="panel-hd">
+            <span class="panel-title">Validation Metrics</span>
+            <span class="panel-badge">IoU / Dice / Prec / Rec</span>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="c-val-metrics"></canvas>
+          </div>
+          <div class="legend-row" id="val-legend">
+            <span class="leg-item"><span class="swatch sw-dark"></span>Roads</span>
+            <span class="leg-item"><span class="swatch sw-mid"></span>Changes</span>
+          </div>
+          <div class="mini-stat-grid" id="validation-stat-grid"></div>
+        </div>
 
-    <script src="./report-data.js"></script>
-    <script src="./app.js"></script>
-  </body>
+      </div>
+    </div>
+
+    <div class="two-col-grid tables-row">
+      <div class="panel table-panel">
+        <div class="panel-hd">
+          <span class="panel-title">Model Performance</span>
+        </div>
+        <table class="data-table" id="perf-table">
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Epochs</th>
+              <th>Val Loss</th>
+              <th>Val IoU</th>
+              <th>Val Dice</th>
+              <th>Val Prec.</th>
+              <th>Val Recall</th>
+            </tr>
+          </thead>
+          <tbody id="perf-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="panel table-panel">
+        <div class="panel-hd">
+          <span class="panel-title">Dataset Registry</span>
+        </div>
+        <table class="data-table" id="ds-table">
+          <thead>
+            <tr>
+              <th>Dataset</th>
+              <th>Status</th>
+              <th>Train</th>
+              <th>Val</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="ds-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-label-row">
+      <span class="section-label">Qualitative Results</span>
+    </div>
+
+    <div class="two-col-grid results-row">
+
+      <div class="panel result-panel">
+        <div class="panel-hd">
+          <span class="panel-title">Road Detection</span>
+          <span class="panel-badge">Image &nbsp;|&nbsp; Ground Truth &nbsp;|&nbsp; Prediction &nbsp;|&nbsp; Overlay</span>
+        </div>
+        <div class="result-frame">
+          <img id="img-road" src="" alt="Road detection panel" onerror="this.parentElement.classList.add('img-missing')">
+          <div class="img-placeholder">No image available</div>
+        </div>
+        <div class="result-meta-row">
+          <span class="rtag">Segmentation</span>
+          <span class="rtag">roads_preview_0</span>
+        </div>
+      </div>
+
+      <div class="panel result-panel">
+        <div class="panel-hd">
+          <span class="panel-title">Change Detection</span>
+          <span class="panel-badge">Time 1 &nbsp;|&nbsp; Time 2 &nbsp;|&nbsp; Ground Truth &nbsp;|&nbsp; Prediction</span>
+        </div>
+        <div class="result-frame">
+          <img id="img-change" src="" alt="Change detection panel" onerror="this.parentElement.classList.add('img-missing')">
+          <div class="img-placeholder">No image available</div>
+        </div>
+        <div class="result-meta-row">
+          <span class="rtag">Change Detection</span>
+          <span class="rtag">changes_preview_0</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="section-label-row">
+      <span class="section-label">System Snapshot</span>
+    </div>
+
+    <div class="registry-grid" id="registry-grid"></div>
+
+  </main>
+
+  <footer class="site-footer">
+    <span>GeoSynth &mdash; Remote Sensing Intelligence Platform</span>
+    <span id="footer-ts"></span>
+  </footer>
+
+  <script src="report-data.js?v=5" onerror="console.warn('report-data.js not found, using fallback data')"></script>
+  <script src="app.js?v=5"></script>
+</body>
 </html>

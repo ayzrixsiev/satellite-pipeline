@@ -1,34 +1,77 @@
-"""Serve the report page with Python's built-in HTTP server.
+"""
+serve.py
+Serves the GeoSynth frontend from the repo root so that
+frontend files can reference outputs/predictions/* correctly.
 
-This is just a convenience wrapper so you can launch the report with one command
-instead of remembering the exact `http.server` invocation.
+Usage (from repo root or frontend/):
+    python frontend/serve.py
+
+The dashboard will be available at:
+    http://127.0.0.1:8000/frontend/
 """
 
-from __future__ import annotations
-
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from pathlib import Path
 import os
-import runpy
+import sys
+import subprocess
+import http.server
+import socketserver
+
+PORT      = 8000
+HOST      = "127.0.0.1"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PORT = 8000
+def rebuild_report():
+    script = os.path.join(REPO_ROOT, "frontend", "build_report.py")
+    if not os.path.isfile(script):
+        print("[WARN] build_report.py not found, skipping rebuild.")
+        return
+    print("[INFO] Rebuilding report-data.js ...")
+    result = subprocess.run(
+        [sys.executable, script],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT
+    )
+    if result.returncode == 0:
+        print(result.stdout.strip())
+    else:
+        print("[WARN] build_report.py returned errors:")
+        print(result.stderr.strip() or result.stdout.strip())
 
 
-def main() -> None:
-    # Refresh the browser payload on every server start so the page reflects
-    # the latest metrics and saved prediction images.
-    runpy.run_path(str(PROJECT_ROOT / "frontend" / "build_report.py"), run_name="__main__")
+class SilentHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        if args and str(args[1]) not in ("200", "304"):
+            print("[HTTP] %s %s" % (self.path, args[1]))
 
-    # We serve from the project root so the frontend can reach both:
-    # - `frontend/index.html`
-    # - `outputs/predictions/...`
-    os.chdir(PROJECT_ROOT)
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
 
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), SimpleHTTPRequestHandler)
-    print(f"Serving GeoSynth report at http://127.0.0.1:{PORT}/frontend/")
-    server.serve_forever()
+
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+
+def main():
+    rebuild_report()
+
+    os.chdir(REPO_ROOT)
+
+    with ReusableTCPServer((HOST, PORT), SilentHandler) as httpd:
+        url = "http://{}:{}/frontend/".format(HOST, PORT)
+        print("")
+        print("  GeoSynth is running at: {}".format(url))
+        print("  Serving from: {}".format(REPO_ROOT))
+        print("  Press Ctrl+C to stop.")
+        print("")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n[INFO] Server stopped.")
 
 
 if __name__ == "__main__":

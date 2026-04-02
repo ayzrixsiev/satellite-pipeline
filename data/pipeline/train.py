@@ -1,5 +1,5 @@
-"""Shared training utilities.
-
+"""
+Shared training utilities
 This file contains the reusable "engine" part of the project:
 - choose device
 - set seeds
@@ -9,7 +9,6 @@ This file contains the reusable "engine" part of the project:
 """
 
 from __future__ import annotations
-
 import json
 from pathlib import Path
 import random
@@ -21,8 +20,8 @@ from torch.utils.data import DataLoader
 from src.shared.metrics import summarize_binary_batch, summarize_epoch_metrics
 
 
+# Make random seeds
 def set_seed(seed: int = 42) -> None:
-    """Set random seeds for more reproducible experiments."""
 
     random.seed(seed)
     np.random.seed(seed)
@@ -32,21 +31,21 @@ def set_seed(seed: int = 42) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+# Pick the device
 def choose_device(prefer_cuda: bool = True) -> torch.device:
-    """Pick the device once instead of scattering this logic everywhere."""
 
     if prefer_cuda and torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
 
 
+# Wrap datasets into dataloaders
 def build_dataloaders(
     train_dataset,
     val_dataset,
     batch_size: int = 4,
     num_workers: int = 0,
 ) -> tuple[DataLoader, DataLoader]:
-    """Wrap datasets in DataLoaders."""
 
     train_loader = DataLoader(
         train_dataset,
@@ -193,7 +192,9 @@ def fit_model(
         )
 
         epoch_record = {"epoch": epoch}
-        epoch_record.update({f"train_{key}": value for key, value in train_metrics.items()})
+        epoch_record.update(
+            {f"train_{key}": value for key, value in train_metrics.items()}
+        )
         epoch_record.update({f"val_{key}": value for key, value in val_metrics.items()})
         history.append(epoch_record)
 
@@ -215,4 +216,3 @@ def fit_model(
         history_path.write_text(json.dumps(history, indent=2), encoding="utf-8")
 
     return history
-

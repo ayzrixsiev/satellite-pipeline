@@ -1,14 +1,11 @@
 """
 This is a file responsible for two things
 - segmentation: one image + one mask
-- change detection: image at time 1 + image at time 2 + one change mask
-
-Keeping pairing logic here is useful because the rest of the system can then
-assume samples are already valid and correctly matched.
+- change detection: image 1 + image 2 + one change mask
+We do this so the rest of the system can work with comfortably paired data
 """
 
 from __future__ import annotations
-
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -16,14 +13,11 @@ import random
 
 LOGGER = logging.getLogger(__name__)
 
-# These are the file types we want to treat as imagery or masks.
 SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
 
 
 @dataclass(frozen=True, slots=True)
 class SegmentationSample:
-    """A single segmentation sample: one image and its paired mask."""
-
     sample_id: str
     image_path: Path
     mask_path: Path
@@ -31,8 +25,6 @@ class SegmentationSample:
 
 @dataclass(frozen=True, slots=True)
 class ChangeDetectionSample:
-    """A single change-detection sample with two timestamps and one label."""
-
     sample_id: str
     image1_path: Path
     image2_path: Path
@@ -65,25 +57,25 @@ def _list_supported_files(directory: str | Path) -> list[Path]:
     )
 
 
-# Split one list into train and validation parts in a reproducible way
+# Split one list into train and validation (if it was not done)
 def _split_list(items: list, val_ratio: float, seed: int) -> tuple[list, list]:
 
     items = list(items)
 
-    # We shuffle with a local Random instance so we do not disturb global state.
+    # We shuffle images so that model does not learn the order
     random_generator = random.Random(seed)
     random_generator.shuffle(items)
 
-    # We keep at least one validation sample when the dataset has more than one
-    # item so that evaluation code does not end up with an empty split.
+    # Keep at least one image for validation
     if len(items) <= 1:
         return items, []
 
+    # Split dataset into 20% for val and 80 for training
     val_count = max(1, int(len(items) * val_ratio))
     val_items = items[:val_count]
     train_items = items[val_count:]
 
-    # If the dataset is tiny, make sure training does not become empty.
+    # If the dataset is tiny, make sure training does not become empty
     if not train_items:
         train_items = val_items[:1]
         val_items = val_items[1:]
@@ -93,7 +85,7 @@ def _split_list(items: list, val_ratio: float, seed: int) -> tuple[list, list]:
 
 class SegmentationIngestor:
     """
-    Generic ingestor for segmentation datasets.
+    Generic ingestor for segmentation datasets
     This ingestor works for both:
     - road detection
     - land vs water segmentation
@@ -115,12 +107,12 @@ class SegmentationIngestor:
         self.val_masks_dir = Path(val_masks_dir) if val_masks_dir is not None else None
         self.split_seed = split_seed
 
+    # Pair image files with mask files by matching their stem
     def _pair_directories(
         self,
         images_dir: str | Path,
         masks_dir: str | Path,
     ) -> list[SegmentationSample]:
-        """Pair image files with mask files by matching their stem."""
 
         image_files = _list_supported_files(images_dir)
         mask_files = _list_supported_files(masks_dir)
@@ -163,8 +155,8 @@ class SegmentationIngestor:
     def build_splits(
         self, val_ratio: float = 0.2
     ) -> tuple[list[SegmentationSample], list[SegmentationSample]]:
-        """Return train and validation samples.
-
+        """
+        Return train and validation samples.
         If explicit validation folders exist, we use them.
         Otherwise we create a deterministic split from the training folder.
         """
@@ -207,13 +199,13 @@ class ChangeDetectionIngestor:
         self.val_masks_dir = Path(val_masks_dir) if val_masks_dir is not None else None
         self.split_seed = split_seed
 
+    # Pair time-1 images, time-2 images and masks by matching stems
     def _pair_directories(
         self,
         image1_dir: str | Path,
         image2_dir: str | Path,
         masks_dir: str | Path,
     ) -> list[ChangeDetectionSample]:
-        """Pair time-1 images, time-2 images, and masks by matching stems."""
 
         image1_files = _list_supported_files(image1_dir)
         image2_map = {
@@ -262,11 +254,11 @@ class ChangeDetectionIngestor:
 
         return samples
 
+    # Make val and train triplets if was not done manually
     def build_splits(
         self,
         val_ratio: float = 0.2,
     ) -> tuple[list[ChangeDetectionSample], list[ChangeDetectionSample]]:
-        """Return train and validation triplets."""
 
         train_samples = self._pair_directories(
             self.train_image1_dir,
