@@ -22,3 +22,9 @@ System that ingests a dataset with satelite and drone taken images to detect cro
 
 ## Work done, outcomes and what i have learned
 
+I have installed a vector dataset that contains 8435 real agricultural fields drawn as polygons on the map.
+Most important columns:
+- What crop was growing (label_1 = cotton, wheat, etc.)
+- Extra info (label_2 = summer crop, double crop, winter, etc.)
+- Size of the field (area)
+They also added the NDVI time series (23 numbers per field, which is basically day counts in a year). NDVI measures how green and dense the vegetation is at different times of the year. High NDVI = healthy growing crop.
