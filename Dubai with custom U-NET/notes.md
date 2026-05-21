@@ -1,6 +1,0 @@
-- LOSS is how confident the model is in it's wrong predictions, the higher confidence the higher loss number
-- VAL_LOSS is for images that model did not seen, if val loss is going up and loss down, that means model is overfit and 
-- ACURACY is how well the model performed based on the amount of pixels it got wrong (potential problem is that model can be good at predicting land, which is 70% of the image and poorly on roads, which takes smaller space)
-- JACCARD COEFFICIENT (intersection over union) is how close predicted shape is to the actual shape.
-- VAL_JACCARD is the utlimate test in our semantic segmentation, IoU over unseen data
-- LEARNING RATE is the metric to see how big the changes are in weights during iterations
