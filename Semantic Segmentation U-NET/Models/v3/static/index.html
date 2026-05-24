@@ -4,220 +4,236 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GEO-SEG Interactive</title>
+    <meta name="description" content="GEO-SEG Interactive - Multitemporal Land Cover Segmentation Inference Dashboard">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQO3GQtfpI3ux5x64E5xOew5iYghxw=" crossorigin="">
+    <!-- Use Inter for a clean, premium sans-serif look matching the screenshot -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         :root {
-            --bg: #070b12;
-            --panel: rgba(10, 16, 26, 0.97);
-            --panel-2: rgba(4, 7, 12, 0.82);
-            --line: rgba(44, 230, 199, 0.12);
-            --line-strong: rgba(44, 230, 199, 0.42);
-            --cyan: #2ce6c7;
-            --text: #c4d4e2;
-            --muted: #5a7a96;
-            --dim: #2a4057;
+            /* Match the screenshot's exact dark slate theme */
+            --bg: #1e2630;
+            --panel: #232e3c;
+            --panel-border: rgba(255, 255, 255, 0.05);
+            --cyan: #3fd9cb;
+            --cyan-dim: rgba(63, 217, 203, 0.15);
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent-bg: rgba(63, 217, 203, 0.08);
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
-        * {
+        *,
+        *::before,
+        *::after {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ── Critical Leaflet CSS fallback ── */
+        .leaflet-pane,
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow,
+        .leaflet-tile-container,
+        .leaflet-pane > svg,
+        .leaflet-pane > canvas,
+        .leaflet-zoom-box,
+        .leaflet-image-layer,
+        .leaflet-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        .leaflet-container {
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: content-box !important;
+        }
+
+        .leaflet-container * {
+            box-sizing: content-box !important;
+        }
+
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .leaflet-tile-container {
+            pointer-events: none;
+        }
+
+        .leaflet-container img {
+            max-width: none !important;
+            max-height: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            outline: none !important;
+        }
+
+        .leaflet-tile {
+            filter: inherit;
+            visibility: inherit;
+        }
+
+        .leaflet-zoom-animated {
+            transform-origin: 0 0;
         }
 
         html,
         body {
-            min-height: 100%;
+            height: 100vh;
+            background: var(--bg);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden; /* Prevent scrolling if it fits */
         }
 
-        body {
-            margin: 0;
-            overflow-x: hidden;
-            overflow-y: auto;
-            background:
-                radial-gradient(rgba(44, 230, 199, 0.045) 1px, transparent 1px) 0 0 / 26px 26px,
-                var(--bg);
-            color: var(--text);
-            font-family: "JetBrains Mono", monospace;
-            letter-spacing: 0;
-        }
-
-        button,
-        input {
-            font: inherit;
-        }
-
+        /* ── Page Layout ──────────────────────────────── */
         .page {
-            width: min(1840px, calc(100vw - 24px));
-            margin: 12px auto 24px;
+            width: 100%;
+            height: 100vh;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
+        /* ── Logo Bar ─────────────────────────────────── */
         .logo-bar {
-            min-height: 58px;
+            height: 56px;
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 10px 22px;
-            margin-bottom: 12px;
-            border: 1px solid rgba(44, 230, 199, 0.13);
-            border-radius: 10px;
-            background: linear-gradient(135deg, rgba(10, 16, 26, 0.99), rgba(7, 11, 18, 1));
-            box-shadow:
-                0 4px 24px rgba(0, 0, 0, 0.5),
-                inset 0 1px 0 rgba(44, 230, 199, 0.1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .logo-bar::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 18%;
-            right: 18%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(44, 230, 199, 0.55), transparent);
+            gap: 12px;
+            padding: 0 24px;
+            background: var(--panel);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--panel-border);
+            flex-shrink: 0;
         }
 
         .logo-icon {
-            width: 28px;
-            height: 28px;
-            border: 1.5px solid rgba(44, 230, 199, 0.55);
-            border-radius: 50%;
-            display: grid;
-            place-items: center;
-            flex: 0 0 auto;
-            color: rgba(44, 230, 199, 0.85);
-            box-shadow: 0 0 10px rgba(44, 230, 199, 0.18), inset 0 0 8px rgba(44, 230, 199, 0.05);
+            color: var(--cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .logo-icon svg {
-            width: 18px;
-            height: 18px;
+            width: 24px;
+            height: 24px;
             stroke: currentColor;
             fill: none;
-            stroke-width: 1.5;
+            stroke-width: 2;
         }
 
         .logo-text {
-            font-family: "Syne", sans-serif;
-            font-size: clamp(15px, 1.5vw, 22px);
-            font-weight: 800;
-            letter-spacing: 4.5px;
-            color: var(--text);
-            text-transform: uppercase;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
         }
 
         .logo-text span {
-            color: var(--cyan);
-            text-shadow: 0 0 14px rgba(44, 230, 199, 0.45);
+            font-weight: 400;
+            color: var(--text-muted);
         }
 
         .logo-actions {
             margin-left: auto;
             display: flex;
-            gap: 10px;
+            gap: 16px;
             align-items: center;
+            color: var(--text-muted);
         }
 
-        .logo-btn {
-            font-size: 8px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: rgba(44, 230, 199, 0.42);
-            border: 1px solid rgba(44, 230, 199, 0.12);
-            border-radius: 4px;
-            padding: 6px 13px;
-            background: rgba(44, 230, 199, 0.03);
+        .logo-actions svg {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            transition: color 0.2s;
         }
 
+        .logo-actions svg:hover {
+            color: var(--cyan);
+        }
+
+        /* ── Grid Layout ──────────────────────────────── */
         .layout {
             display: grid;
-            grid-template-columns: 310px minmax(520px, 1fr) 390px;
-            gap: 12px;
-            align-items: start;
+            grid-template-columns: 280px minmax(0, 1fr) 340px;
+            gap: 16px;
+            flex: 1;
+            min-height: 0;
         }
 
+        /* ── Panel Base ───────────────────────────────── */
         .panel {
-            min-width: 0;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            background: linear-gradient(170deg, rgba(10, 16, 26, 0.97), rgba(7, 11, 18, 0.99));
-            box-shadow:
-                0 0 0 1px rgba(44, 230, 199, 0.03),
-                0 8px 40px rgba(0, 0, 0, 0.6),
-                inset 0 1px 0 rgba(44, 230, 199, 0.09);
+            background: var(--panel);
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        .panel::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 20%;
-            right: 20%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(44, 230, 199, 0.45), transparent);
-        }
-
-        .panel-section {
-            padding: 14px 16px;
-            border-bottom: 1px solid rgba(44, 230, 199, 0.06);
-        }
-
-        .panel-section:last-child {
-            border-bottom: 0;
+        .panel-padding {
+            padding: 20px;
         }
 
         .section-title {
-            display: flex;
-            align-items: center;
-            gap: 9px;
-            margin: 0 0 13px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(44, 230, 199, 0.07);
-            font-size: 8.5px;
+            font-size: 11px;
             font-weight: 600;
-            letter-spacing: 3px;
+            letter-spacing: 1px;
             text-transform: uppercase;
-            color: rgba(44, 230, 199, 0.42);
+            color: var(--text-main);
+            margin-bottom: 16px;
         }
 
-        .section-title::before {
-            content: "";
-            width: 7px;
-            height: 7px;
-            border: 1px solid rgba(44, 230, 199, 0.42);
-            border-radius: 2px;
-            box-shadow: 0 0 6px rgba(44, 230, 199, 0.15);
+        /* ── Left Panel: Layer Management ─────────────── */
+        .toggles-container {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 32px;
         }
 
         .toggle-row {
-            min-height: 35px;
-            display: grid;
-            grid-template-columns: 14px minmax(0, 1fr) 38px;
+            display: flex;
             align-items: center;
-            gap: 10px;
-            color: rgba(90, 130, 155, 0.96);
-            font-size: 9.5px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
         }
 
-        .swatch {
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
+        .swatch-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 12px;
+            border-radius: 3px;
             background: var(--class-color);
-            box-shadow: 0 0 8px color-mix(in srgb, var(--class-color) 55%, transparent);
+        }
+
+        .toggle-row span:nth-child(2) {
+            flex: 1;
         }
 
         .switch {
             position: relative;
             width: 36px;
-            height: 19px;
-            justify-self: end;
+            height: 20px;
         }
 
         .switch input {
@@ -229,127 +245,168 @@
         .switch span {
             position: absolute;
             inset: 0;
-            border: 1px solid rgba(44, 230, 199, 0.16);
+            background: #151b23;
             border-radius: 20px;
-            background: rgba(20, 32, 50, 0.9);
             cursor: pointer;
-            transition: 160ms ease;
+            transition: 0.3s;
+            border: 1px solid var(--panel-border);
         }
 
         .switch span::before {
             content: "";
             position: absolute;
-            width: 12px;
-            height: 12px;
-            left: 3px;
-            top: 2.5px;
+            width: 14px;
+            height: 14px;
+            left: 2px;
+            top: 2px;
+            background: #475569;
             border-radius: 50%;
-            background: rgba(44, 230, 199, 0.25);
-            transition: 160ms ease;
+            transition: 0.3s;
         }
 
         .switch input:checked + span {
-            border-color: rgba(44, 230, 199, 0.48);
-            background: rgba(44, 230, 199, 0.12);
-            box-shadow: 0 0 10px rgba(44, 230, 199, 0.18);
+            background: var(--cyan);
+            border-color: var(--cyan);
         }
 
         .switch input:checked + span::before {
-            transform: translateX(17px);
-            background: var(--cyan);
-            box-shadow: 0 0 8px rgba(44, 230, 199, 0.7);
+            transform: translateX(16px);
+            background: #1e2630;
         }
 
-        .summary-grid,
-        .class-stats {
-            display: grid;
-            gap: 0;
+        /* ── Left Panel: Stats ────────────────────────── */
+        .stats-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
         }
 
-        .stat-row,
-        .class-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 12px;
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            padding: 7px 0;
-            border-bottom: 1px solid rgba(44, 230, 199, 0.045);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 8px;
         }
 
-        .stat-key,
-        .class-name {
-            min-width: 0;
-            color: rgba(60, 85, 110, 0.96);
-            font-size: 8.5px;
-            letter-spacing: 1.5px;
+        .stat-key {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
+            color: var(--text-muted);
         }
 
-        .stat-value,
-        .class-value {
-            color: #6a8ea8;
-            font-size: 9.5px;
+        .stat-value {
+            font-size: 13px;
             font-weight: 500;
-            white-space: nowrap;
+            color: var(--text-main);
         }
 
-        .class-meter {
-            grid-column: 1 / -1;
-            height: 3px;
-            border-radius: 4px;
-            background: rgba(8, 14, 24, 0.95);
+        /* ── Left Panel: Class Coverage (Donuts/Bars) ─── */
+        .class-coverage-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .coverage-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .coverage-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            width: 80px;
+        }
+
+        .coverage-bar-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .coverage-track {
+            flex: 1;
+            height: 32px;
+            background: #151b23;
+            border-radius: 16px;
+            position: relative;
             overflow: hidden;
+            display: flex;
+            align-items: center;
         }
 
-        .class-meter span {
-            display: block;
-            width: var(--meter, 0%);
+        .coverage-fill {
             height: 100%;
-            border-radius: inherit;
-            background: var(--class-color);
-            box-shadow: 0 0 8px color-mix(in srgb, var(--class-color) 50%, transparent);
+            background: var(--cyan);
+            border-radius: 16px;
         }
 
-        .map-panel {
-            padding: 12px;
+        .coverage-value {
+            position: absolute;
+            right: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* ── Center Panel ─────────────────────────────── */
+        .center-panel {
+            background: transparent;
+            box-shadow: none;
+            border: none;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         .upload-zone {
-            min-height: 92px;
-            display: grid;
-            place-items: center;
-            margin-bottom: 10px;
-            border: 1px dashed rgba(44, 230, 199, 0.18);
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border: 1.5px dashed rgba(63, 217, 203, 0.4);
             border-radius: 8px;
-            background: rgba(4, 7, 12, 0.62);
-            color: rgba(44, 230, 199, 0.38);
-            font-size: 9px;
-            letter-spacing: 2.5px;
+            background: var(--accent-bg);
+            color: var(--cyan);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
             cursor: pointer;
-            transition: 160ms ease;
+            transition: all 0.2s;
+            flex-shrink: 0;
         }
 
-        .upload-zone:hover,
-        .upload-zone.dragover {
-            border-color: rgba(44, 230, 199, 0.45);
-            color: rgba(44, 230, 199, 0.78);
-            background: rgba(44, 230, 199, 0.035);
+        .upload-zone:hover, .upload-zone.dragover {
+            background: rgba(63, 217, 203, 0.15);
+            border-color: var(--cyan);
         }
 
-        .upload-zone.busy {
-            color: var(--cyan);
+        .upload-zone svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
         }
 
         .map-frame {
+            flex: 1;
             position: relative;
-            height: clamp(520px, 58vh, 660px);
-            min-height: 520px;
-            border: 1px solid rgba(44, 230, 199, 0.12);
             border-radius: 8px;
             overflow: hidden;
-            background: #040710;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+            background: #000;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         #map {
@@ -357,55 +414,34 @@
             inset: 0;
             width: 100%;
             height: 100%;
-            background: #040710;
+            background: #000;
+            z-index: 1;
         }
 
-        .map-frame::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            box-shadow: inset 0 0 0 1px rgba(44, 230, 199, 0.08), inset 0 0 40px rgba(0, 0, 0, 0.35);
-            z-index: 401;
-        }
-
+        /* ── Leaflet Overrides ── */
         .leaflet-container {
-            font-family: "JetBrains Mono", monospace;
-            background: #040710;
+            font-family: var(--font-family);
+            background: #000 !important;
         }
-
         .leaflet-control-attribution {
-            display: none;
+            display: none !important;
         }
 
-        .leaflet-control-zoom a {
-            background: rgba(10, 16, 26, 0.94);
-            color: var(--cyan);
-            border-bottom-color: rgba(44, 230, 199, 0.1);
-        }
-
-        .leaflet-control-zoom a:hover {
-            background: rgba(20, 32, 50, 0.96);
-            color: #dffffa;
-        }
-
+        /* ── Right Panel: Analysis Results ────────────── */
         .preview-box {
             position: relative;
-            aspect-ratio: 1 / 1;
+            aspect-ratio: 16 / 10;
+            border-radius: 6px;
+            background: #151b23;
+            border: 1px solid var(--panel-border);
             overflow: hidden;
-            border: 1px solid rgba(44, 230, 199, 0.16);
-            border-radius: 7px;
-            background: rgba(4, 7, 12, 0.82);
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+            margin-bottom: 12px;
         }
 
         .preview-box img {
-            position: absolute;
-            inset: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            image-rendering: auto;
             display: none;
         }
 
@@ -416,253 +452,233 @@
         .empty-box {
             position: absolute;
             inset: 0;
-            display: grid;
-            place-items: center;
-            color: rgba(25, 45, 70, 0.9);
-            font-size: 9px;
-            letter-spacing: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-muted);
             text-transform: uppercase;
-        }
-
-        .legend {
-            display: grid;
-            gap: 4px;
-            margin: 10px 0 14px;
-        }
-
-        .legend-row {
-            color: var(--class-color);
-            font-size: 8.5px;
             letter-spacing: 1px;
-            text-transform: uppercase;
         }
 
-        .chart-title {
-            margin: 8px 0 6px;
-            color: rgba(44, 230, 199, 0.38);
-            font-size: 8.5px;
-            letter-spacing: 2.5px;
-            text-transform: uppercase;
+        .legend-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .legend-item {
+            font-size: 10px;
+            color: var(--class-color);
         }
 
         .area-chart {
+            height: 100px;
             position: relative;
-            height: 130px;
-            border-top: 1px solid rgba(44, 230, 199, 0.08);
-            border-bottom: 1px solid rgba(44, 230, 199, 0.08);
-            background:
-                linear-gradient(rgba(44, 230, 199, 0.06) 1px, transparent 1px) 0 0 / 100% 33.333%,
-                rgba(8, 18, 28, 0.78);
+            margin-bottom: 8px;
+            background: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 100% 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
         .area-chart svg {
-            position: absolute;
-            inset: 0;
             width: 100%;
             height: 100%;
         }
 
         .chart-labels {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            min-height: 24px;
-            align-items: end;
-            text-align: center;
-            color: #8ea8ba;
-            font-size: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
         }
 
-        .confidence-title {
-            margin: 13px 0 8px;
-            color: var(--text);
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
+        .confidence-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
             text-transform: uppercase;
+            margin-bottom: 12px;
         }
 
-        .confidence-title span,
-        .jaccard span {
+        .confidence-label span {
             color: var(--cyan);
-            text-shadow: 0 0 10px rgba(44, 230, 199, 0.35);
         }
 
-        .bars {
-            height: 112px;
-            display: grid;
-            grid-template-columns: repeat(18, 1fr);
-            align-items: end;
-            gap: 6px;
-            padding: 8px 4px 0;
-            border-bottom: 1px solid rgba(196, 212, 226, 0.42);
-            background:
-                linear-gradient(rgba(196, 212, 226, 0.1) 1px, transparent 1px) 0 0 / 100% 50%,
-                rgba(8, 18, 28, 0.46);
+        .confidence-bars {
+            height: 60px;
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
         }
 
-        .bars i {
-            display: block;
-            height: var(--bar, 20%);
-            min-height: 6px;
+        .confidence-bars i {
+            flex: 1;
+            background: var(--cyan);
+            min-height: 4px;
+            height: var(--bar);
             border-radius: 2px 2px 0 0;
-            background: linear-gradient(180deg, #6ffff4, #24c8bd);
-            opacity: 0.88;
         }
 
-        .jaccard {
-            margin-top: 13px;
-            font-size: 16px;
-            font-weight: 700;
+        .jaccard-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .jaccard-label span {
+            color: var(--cyan);
+        }
+
+        .jaccard-progress {
+            height: 12px;
+            background: #151b23;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .jaccard-progress span {
+            display: block;
+            height: 100%;
+            background: var(--cyan);
+            width: var(--progress, 0%);
+            border-radius: 6px;
+        }
+
+        .status-footer {
+            margin-top: auto;
+            text-align: right;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding-top: 16px;
             text-transform: uppercase;
         }
 
-        .progress {
-            height: 31px;
-            margin-top: 8px;
-            overflow: hidden;
-            border-radius: 4px;
-            background: #263748;
-        }
-
-        .progress span {
-            display: block;
-            width: var(--progress, 0%);
-            height: 100%;
-            background: linear-gradient(90deg, #21c3bd, #4af0e6);
+        .status-footer span {
+            color: var(--cyan);
         }
 
         .hidden-input {
-            position: fixed;
-            width: 1px;
-            height: 1px;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        @media (max-width: 1280px) {
-            .layout {
-                grid-template-columns: 290px minmax(420px, 1fr);
-            }
-
-            .analysis-panel {
-                grid-column: 1 / -1;
-            }
-        }
-
-        @media (max-width: 820px) {
-            .page {
-                width: calc(100vw - 12px);
-                margin-top: 6px;
-            }
-
-            .layout {
-                grid-template-columns: 1fr;
-            }
-
-            .logo-bar {
-                flex-wrap: wrap;
-            }
-
-            .logo-actions {
-                width: 100%;
-                margin-left: 43px;
-            }
-
-            .map-frame {
-                height: 540px;
-            }
+            display: none;
         }
     </style>
 </head>
 <body>
     <input id="file-input" class="hidden-input" type="file" accept="image/*">
 
-    <main class="page">
+    <div class="page">
+        <!-- Logo Bar -->
         <header class="logo-bar">
-            <div class="logo-icon" aria-hidden="true">
+            <div class="logo-icon">
                 <svg viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="8"></circle>
-                    <path d="M4 12h16"></path>
-                    <path d="M12 4c2.4 2.6 2.4 13.4 0 16"></path>
-                    <path d="M12 4c-2.4 2.6-2.4 13.4 0 16"></path>
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M3.6 9h16.8M3.6 15h16.8"></path>
+                    <path d="M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18"></path>
                 </svg>
             </div>
             <div class="logo-text">GEO-SEG <span>INTERACTIVE</span></div>
             <div class="logo-actions">
-                <span class="logo-btn">Settings</span>
-                <span class="logo-btn">Export</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </div>
         </header>
 
-        <section class="layout">
-            <aside class="panel">
-                <div class="panel-section">
-                    <h2 class="section-title">Layer Management</h2>
-                    <div id="toggle-list"></div>
+        <!-- Main Layout -->
+        <div class="layout">
+            <!-- Left Panel -->
+            <div class="panel panel-padding">
+                <div class="section-title">Layer Management & Stats</div>
+                
+                <div class="toggles-container" id="toggle-list">
+                    <!-- Toggles injected via JS -->
                 </div>
 
-                <div class="panel-section">
-                    <h2 class="section-title">Prediction Stats</h2>
-                    <div class="summary-grid">
-                        <div class="stat-row"><span class="stat-key">Region</span><span class="stat-value">Tashkent A.O.I.</span></div>
-                        <div class="stat-row"><span class="stat-key">Image Pixels</span><span class="stat-value" id="stat-total-pixels">0</span></div>
-                        <div class="stat-row"><span class="stat-key">Detected Classes</span><span class="stat-value" id="stat-class-count">0 / 6</span></div>
-                        <div class="stat-row"><span class="stat-key">Dominant Class</span><span class="stat-value" id="stat-dominant">None</span></div>
+                <div class="section-title">Stats</div>
+                <div class="stats-grid">
+                    <div class="stat-row">
+                        <span class="stat-key">Region</span>
+                        <span class="stat-value">Tashkent A.O.I.</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">Image Pixels</span>
+                        <span class="stat-value" id="stat-total-pixels">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">Detected Classes</span>
+                        <span class="stat-value" id="stat-class-count">0 / 6</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key" style="border:none">Dominant Class</span>
+                        <span class="stat-value" id="stat-dominant">None</span>
                     </div>
                 </div>
 
-                <div class="panel-section">
-                    <h2 class="section-title">Class Coverage</h2>
-                    <div class="class-stats" id="class-stats"></div>
+                <!-- Replace donut charts with nice progress bars for our classes -->
+                <div class="class-coverage-container" id="class-stats">
+                    <!-- Coverage injected via JS -->
                 </div>
-            </aside>
+            </div>
 
-            <section class="panel map-panel" id="dropzone">
-                <div class="upload-zone" id="upload-zone">Drag satellite image here or click to upload</div>
-                <div class="map-frame">
+            <!-- Center Panel -->
+            <div class="center-panel">
+                <div class="upload-zone" id="upload-zone">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>Drag Satellite Image Here</span>
+                </div>
+                
+                <div class="map-frame" id="dropzone">
                     <div id="map"></div>
                 </div>
-            </section>
+            </div>
 
-            <aside class="panel analysis-panel">
-                <div class="panel-section">
-                    <h2 class="section-title">Analysis Results</h2>
-                    <div class="preview-box" id="preview-box">
-                        <div class="empty-box" id="preview-empty">No Input</div>
-                    </div>
-
-                    <div class="legend" id="legend"></div>
-
-                    <div class="chart-title">Class Profile</div>
-                    <div class="area-chart">
-                        <svg viewBox="0 0 360 130" preserveAspectRatio="none" aria-hidden="true">
-                            <path id="profile-fill" d="M0 130 L0 120 L72 120 L144 120 L216 120 L288 120 L360 120 L360 130 Z" fill="rgba(44, 230, 199, 0.58)"></path>
-                            <path id="profile-line" d="M0 120 L72 120 L144 120 L216 120 L288 120 L360 120" fill="none" stroke="#2ce6c7" stroke-width="3"></path>
-                        </svg>
-                    </div>
-                    <div class="chart-labels">
-                        <span>C0</span><span>C1</span><span>C2</span><span>C3</span><span>C4</span><span>C5</span>
-                    </div>
-
-                    <p class="confidence-title">V3 Model Confidence: <span id="confidence-value">89.5%</span></p>
-                    <div class="bars" id="confidence-bars" aria-hidden="true"></div>
-
-                    <div class="jaccard">Jaccard Index: <span id="jaccard-value">0.312</span></div>
-                    <div class="progress"><span id="jaccard-bar"></span></div>
+            <!-- Right Panel -->
+            <div class="panel panel-padding">
+                <div class="section-title">Analysis Results</div>
+                
+                <div class="preview-box" id="preview-box">
+                    <div class="empty-box" id="preview-empty">No Input</div>
                 </div>
-            </aside>
-        </section>
-    </main>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+                <div class="legend-list" id="legend"></div>
+
+                <div class="area-chart">
+                    <svg viewBox="0 0 360 100" preserveAspectRatio="none">
+                        <path id="profile-fill" d="M0 100 L0 90 L72 90 L144 90 L216 90 L288 90 L360 90 L360 100 Z" fill="rgba(63, 217, 203, 0.4)"></path>
+                        <path id="profile-line" d="M0 90 L72 90 L144 90 L216 90 L288 90 L360 90" fill="none" stroke="#3fd9cb" stroke-width="2"></path>
+                    </svg>
+                </div>
+                <div class="chart-labels">
+                    <span>Class 1</span><span>Class 2</span><span>Class 3</span><span>Class 4</span><span>Class 5</span><span>Class 6</span>
+                </div>
+
+                <div class="confidence-label">V3 Model Confidence: <span id="confidence-value">89.2%</span></div>
+                <div class="confidence-bars" id="confidence-bars"></div>
+
+                <div class="jaccard-label">Jaccard Index: <span id="jaccard-value">0.312</span></div>
+                <div class="jaccard-progress"><span id="jaccard-bar" style="--progress: 31.2%"></span></div>
+
+                <div class="status-footer">System: <span>V3 Model Deployed</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const CLASS_META = [
-            { key: "building", id: 0, label: "Building", color: "#3c1098", rgb: [60, 16, 152] },
-            { key: "land", id: 1, label: "Land", color: "#8429f6", rgb: [132, 41, 246] },
-            { key: "road", id: 2, label: "Road", color: "#6ec1e4", rgb: [110, 193, 228] },
-            { key: "vegetation", id: 3, label: "Vegetation", color: "#fedd3a", rgb: [254, 221, 58] },
-            { key: "water", id: 4, label: "Water", color: "#e2a929", rgb: [226, 169, 41] },
-            { key: "unlabeled", id: 5, label: "Unlabeled", color: "#9b9b9b", rgb: [155, 155, 155] }
+            { key: "building", id: 0, label: "Building", color: "#6a5acd", rgb: [106, 90, 205] },
+            { key: "land", id: 1, label: "Land", color: "#9370db", rgb: [147, 112, 219] },
+            { key: "road", id: 2, label: "Road", color: "#48d1cc", rgb: [72, 209, 204] },
+            { key: "vegetation", id: 3, label: "Vegetation", color: "#3cb371", rgb: [60, 179, 113] },
+            { key: "water", id: 4, label: "Water", color: "#4169e1", rgb: [65, 105, 225] },
+            { key: "unlabeled", id: 5, label: "Unlabeled", color: "#808080", rgb: [128, 128, 128] }
         ];
 
         const bounds = L.latLngBounds([[41.2930, 69.2320], [41.3060, 69.2480]]);
@@ -680,15 +696,21 @@
         let uploadedLayer = null;
         let predictionData = null;
 
+        /* ── Tile Layers ── */
+        // Use Esri World Imagery as the primary satellite basemap
         const satelliteLayer = L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            { maxZoom: 21, maxNativeZoom: 19 }
-        );
-        const darkLayer = L.tileLayer(
-            "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-            { maxZoom: 20 }
+            {
+                maxZoom: 21,
+                maxNativeZoom: 19,
+                updateWhenIdle: true,
+                updateWhenZooming: false,
+                keepBuffer: 4,
+                fadeDuration: 0
+            }
         );
 
+        /* ── Map Init ── */
         const map = L.map("map", {
             center,
             zoom: 16,
@@ -696,7 +718,13 @@
             maxZoom: 21,
             zoomControl: true,
             attributionControl: false,
-            preferCanvas: true
+            preferCanvas: true,
+            zoomAnimation: true,
+            fadeAnimation: false,
+            markerZoomAnimation: true,
+            zoomSnap: 0.5,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 120
         });
 
         map.createPane("uploadedPane");
@@ -705,17 +733,22 @@
         map.getPane("predictionPane").style.zIndex = 460;
 
         satelliteLayer.addTo(map);
-        L.rectangle(bounds, {
-            color: "#2ce6c7",
-            weight: 1,
-            dashArray: "7 6",
-            fillOpacity: 0,
-            interactive: false
-        }).addTo(map);
-        map.fitBounds(bounds, { padding: [18, 18] });
-        setTimeout(() => map.invalidateSize(true), 80);
-        window.addEventListener("resize", () => map.invalidateSize(true));
 
+        // Removed L.rectangle to get rid of the cyan box on the map
+
+        map.fitBounds(bounds, { padding: [18, 18] });
+
+        requestAnimationFrame(function () {
+            setTimeout(function () {
+                map.invalidateSize({ animate: false });
+            }, 100);
+        });
+
+        window.addEventListener("resize", function () {
+            map.invalidateSize({ animate: false });
+        });
+
+        /* ── Controls ── */
         function buildControls() {
             const toggleList = document.getElementById("toggle-list");
             toggleList.innerHTML = "";
@@ -723,7 +756,7 @@
             const basemap = document.createElement("div");
             basemap.className = "toggle-row";
             basemap.innerHTML = `
-                <span class="swatch" style="--class-color:#6a8ea8"></span>
+                <div class="swatch-icon" style="--class-color:#64748b"></div>
                 <span>Satellite Basemap</span>
                 <label class="switch"><input type="checkbox" id="toggle-basemap" checked><span></span></label>
             `;
@@ -735,7 +768,7 @@
                 const row = document.createElement("div");
                 row.className = "toggle-row";
                 row.innerHTML = `
-                    <span class="swatch" style="--class-color:${item.color}"></span>
+                    <div class="swatch-icon" style="--class-color:${item.color}"></div>
                     <span>Class ${item.id}: ${item.label}</span>
                     <label class="switch"><input type="checkbox" id="toggle-${item.key}" checked><span></span></label>
                 `;
@@ -746,15 +779,15 @@
 
             const legend = document.getElementById("legend");
             legend.innerHTML = CLASS_META.map((item) => (
-                `<div class="legend-row" style="--class-color:${item.color}">Class ${item.id}: ${item.label}</div>`
+                `<div class="legend-item" style="--class-color:${item.color}">Class ${item.id}: ${item.label} (${item.color})</div>`
             )).join("");
 
             const bars = document.getElementById("confidence-bars");
-            const trajectory = [31, 43, 47, 52, 58, 57, 63, 68, 66, 72, 78, 82, 84, 88, 90, 92, 96, 89.5];
+            const trajectory = [31, 43, 47, 52, 58, 57, 63, 68, 66, 72, 78, 82, 84, 88, 90, 92, 96, 89.2];
             bars.innerHTML = trajectory.map((value) => `<i style="--bar:${value}%"></i>`).join("");
-            document.getElementById("jaccard-bar").style.setProperty("--progress", "31.2%");
         }
 
+        /* ── Layer Visibility ── */
         function addOrRemove(layer, visible) {
             if (!layer) return;
             const hasLayer = map.hasLayer(layer);
@@ -763,13 +796,7 @@
         }
 
         function syncLayerVisibility() {
-            if (toggles.basemap.checked) {
-                addOrRemove(darkLayer, false);
-                addOrRemove(satelliteLayer, true);
-            } else {
-                addOrRemove(satelliteLayer, false);
-                addOrRemove(darkLayer, true);
-            }
+            addOrRemove(satelliteLayer, toggles.basemap.checked);
 
             CLASS_META.forEach((item) => {
                 const visible = toggles[item.key].checked;
@@ -781,13 +808,12 @@
 
             if (predictionData) {
                 const anyVisible = CLASS_META.some((item) => toggles[item.key].checked);
-                previewEmpty.style.display = anyVisible ? "none" : "grid";
+                previewEmpty.style.display = anyVisible ? "none" : "flex";
                 previewEmpty.textContent = anyVisible ? "" : "All Classes Hidden";
             }
-
-            setTimeout(() => map.invalidateSize(true), 40);
         }
 
+        /* ── Prediction Handling ── */
         function clearPrediction() {
             if (uploadedLayer && map.hasLayer(uploadedLayer)) {
                 map.removeLayer(uploadedLayer);
@@ -824,7 +850,7 @@
             });
 
             map.fitBounds(bounds, { padding: [18, 18] });
-            setTimeout(() => map.invalidateSize(true), 80);
+            setTimeout(() => map.invalidateSize({ animate: false }), 80);
             syncLayerVisibility();
         }
 
@@ -857,14 +883,18 @@
             document.getElementById("stat-dominant").textContent = dominant && dominant.pixels > 0 ? dominant.label : "None";
 
             document.getElementById("class-stats").innerHTML = ordered.map((item) => `
-                <div class="class-row" style="--class-color:${item.color}">
-                    <span class="class-name">Class ${item.id}: ${item.label}</span>
-                    <span class="class-value">${numberFormat.format(item.pixels)} px / ${Number(item.percent).toFixed(1)}%</span>
-                    <div class="class-meter"><span style="--meter:${Math.min(100, item.percent)}%"></span></div>
+                <div class="coverage-row">
+                    <div class="coverage-label">${item.label}</div>
+                    <div class="coverage-bar-container">
+                        <div class="coverage-track">
+                            <div class="coverage-fill" style="width: ${Math.min(100, item.percent)}%; background: ${item.color}"></div>
+                            <div class="coverage-value">${Number(item.percent).toFixed(1)}%</div>
+                        </div>
+                    </div>
                 </div>
             `).join("");
 
-            document.getElementById("confidence-value").textContent = `${Number(data.stats.confidence || 89.5).toFixed(1)}%`;
+            document.getElementById("confidence-value").textContent = `${Number(data.stats.confidence || 89.2).toFixed(1)}%`;
             document.getElementById("jaccard-value").textContent = Number(data.stats.jaccard_index || 0.312).toFixed(3);
             document.getElementById("jaccard-bar").style.setProperty("--progress", `${Math.min(100, (data.stats.jaccard_index || 0.312) * 100)}%`);
             renderClassProfile(ordered);
@@ -873,12 +903,12 @@
         function renderClassProfile(items) {
             const maxValue = Math.max(1, ...items.map((item) => item.percent));
             const width = 360;
-            const height = 130;
-            const bottom = 120;
+            const height = 100;
+            const bottom = 90;
             const points = items.map((item, index) => {
                 const x = index * (width / (items.length - 1));
                 const scaled = item.percent / maxValue;
-                const y = bottom - Math.max(8, scaled * 92);
+                const y = bottom - Math.max(4, scaled * 80);
                 return [x, y];
             });
             const line = points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
@@ -886,9 +916,17 @@
             document.getElementById("profile-fill").setAttribute("d", `${line} L${width} ${height} L0 ${height} Z`);
         }
 
+        /* ── Upload ── */
         function setBusy(isBusy) {
-            uploadZone.classList.toggle("busy", isBusy);
-            uploadZone.textContent = isBusy ? "Processing prediction" : "Drag satellite image here or click to upload";
+            uploadZone.style.pointerEvents = isBusy ? "none" : "auto";
+            if (isBusy) {
+                uploadZone.innerHTML = "<span>Processing prediction…</span>";
+            } else {
+                uploadZone.innerHTML = `
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>Drag Satellite Image Here</span>
+                `;
+            }
         }
 
         async function processFile(file) {
@@ -911,31 +949,32 @@
                 renderStats(data);
             } catch (error) {
                 console.error(error);
-                uploadZone.textContent = "Prediction failed";
+                uploadZone.innerHTML = "<span>Prediction failed — click to retry</span>";
             } finally {
                 setBusy(false);
                 fileInput.value = "";
             }
         }
 
+        /* ── Event Listeners ── */
         uploadZone.addEventListener("click", () => fileInput.click());
         fileInput.addEventListener("change", () => processFile(fileInput.files[0]));
 
         ["dragenter", "dragover"].forEach((eventName) => {
-            dropzone.addEventListener(eventName, (event) => {
+            document.addEventListener(eventName, (event) => {
                 event.preventDefault();
                 uploadZone.classList.add("dragover");
             });
         });
 
         ["dragleave", "drop"].forEach((eventName) => {
-            dropzone.addEventListener(eventName, (event) => {
+            document.addEventListener(eventName, (event) => {
                 event.preventDefault();
                 uploadZone.classList.remove("dragover");
             });
         });
 
-        dropzone.addEventListener("drop", (event) => {
+        document.addEventListener("drop", (event) => {
             processFile(event.dataTransfer.files[0]);
         });
 
@@ -944,6 +983,7 @@
             if (imageItem) processFile(imageItem.getAsFile());
         });
 
+        /* ── Init ── */
         buildControls();
         syncLayerVisibility();
     </script>
