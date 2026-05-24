@@ -7,14 +7,13 @@
     <meta name="description" content="GEO-SEG Interactive - Multitemporal Land Cover Segmentation Inference Dashboard">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Use Inter for a clean, premium sans-serif look matching the screenshot -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         :root {
-            /* Match the screenshot's exact dark slate theme */
-            --bg: #1e2630;
-            --panel: #232e3c;
+            --bg: #151b23;
+            --panel: #1e2630;
+            --inner-box: #24303f;
             --panel-border: rgba(255, 255, 255, 0.05);
             --cyan: #3fd9cb;
             --cyan-dim: rgba(63, 217, 203, 0.15);
@@ -91,18 +90,19 @@
 
         html,
         body {
-            height: 100vh;
+            min-height: 100vh;
             background: var(--bg);
             color: var(--text-main);
             font-family: var(--font-family);
             -webkit-font-smoothing: antialiased;
-            overflow: hidden; /* Prevent scrolling if it fits */
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         /* ── Page Layout ──────────────────────────────── */
         .page {
             width: 100%;
-            height: 100vh;
+            min-height: 100vh;
             padding: 16px;
             display: flex;
             flex-direction: column;
@@ -187,10 +187,17 @@
             flex-direction: column;
             overflow: hidden;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 16px;
+            gap: 16px;
         }
 
-        .panel-padding {
-            padding: 20px;
+        .inner-box {
+            background: var(--inner-box);
+            border-radius: 6px;
+            padding: 16px;
+            border: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
         }
 
         .section-title {
@@ -199,7 +206,6 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             color: var(--text-main);
-            margin-bottom: 16px;
         }
 
         /* ── Left Panel: Layer Management ─────────────── */
@@ -207,7 +213,6 @@
             display: flex;
             flex-direction: column;
             gap: 14px;
-            margin-bottom: 32px;
         }
 
         .toggle-row {
@@ -274,12 +279,11 @@
             background: #1e2630;
         }
 
-        /* ── Left Panel: Stats ────────────────────────── */
+        /* ── Stats Shared CSS ────────────────────────── */
         .stats-grid {
             display: flex;
             flex-direction: column;
             gap: 16px;
-            margin-bottom: 32px;
         }
 
         .stat-row {
@@ -304,7 +308,7 @@
             color: var(--text-main);
         }
 
-        /* ── Left Panel: Class Coverage (Donuts/Bars) ─── */
+        /* ── Class Coverage (Donuts/Bars) ─── */
         .class-coverage-container {
             display: flex;
             flex-direction: column;
@@ -407,6 +411,7 @@
             background: #000;
             border: 1px solid var(--panel-border);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            min-height: 500px;
         }
 
         #map {
@@ -427,17 +432,18 @@
             display: none !important;
         }
 
-        /* ── Right Panel: Analysis Results ────────────── */
+        /* ── Right Panel ────────────── */
         .preview-box {
             position: relative;
             aspect-ratio: 16 / 10;
-            border-radius: 6px;
+            border-radius: 4px;
             background: #151b23;
-            border: 1px solid var(--panel-border);
+            border: 2px solid var(--cyan);
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 12px;
+            overflow: hidden;
         }
 
         .preview-box-content {
@@ -457,6 +463,7 @@
             display: none;
         }
 
+        /* THIS IS THE CRITICAL FIX FOR PREVIEW IMAGES */
         .preview-box img.visible {
             display: block;
         }
@@ -474,49 +481,59 @@
             letter-spacing: 1px;
         }
 
-        .legend-list {
+        .legend-grid {
             display: flex;
             flex-direction: column;
-            gap: 4px;
-            margin-bottom: 16px;
+            gap: 12px;
+            margin-bottom: 24px;
         }
 
-        .legend-item {
-            font-size: 10px;
-            color: var(--class-color);
+        .chart-wrapper {
+            position: relative;
+            height: 140px;
+        }
+
+        .chart-grid-line {
+            position: relative;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            flex: 1;
+        }
+
+        .chart-grid-line span {
+            position: absolute;
+            left: 0;
+            top: -6px;
+            font-size: 9px;
+            color: var(--text-muted);
+            line-height: 12px;
+            width: 25px;
+            text-align: left;
         }
 
         .area-chart {
-            height: 100px;
-            position: relative;
-            margin-bottom: 8px;
-            background: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 100% 25px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: absolute;
+            left: 25px;
+            right: 0;
+            top: 0;
+            bottom: 25px;
         }
 
         .area-chart svg {
             width: 100%;
             height: 100%;
+            overflow: visible;
         }
 
         .chart-labels {
+            position: absolute;
+            left: 25px;
+            right: 0;
+            bottom: 0;
             display: flex;
             justify-content: space-between;
             font-size: 9px;
             color: var(--text-muted);
-            margin-bottom: 24px;
-        }
-
-        .confidence-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-main);
-            text-transform: uppercase;
-            margin-bottom: 12px;
-        }
-
-        .confidence-label span {
-            color: var(--cyan);
+            line-height: 25px;
         }
 
         .confidence-bars {
@@ -537,41 +554,15 @@
             border-radius: 2px 2px 0 0;
         }
 
-        .jaccard-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-main);
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-        
-        .jaccard-label span {
-            color: var(--cyan);
-        }
-
-        .jaccard-progress {
-            height: 12px;
-            background: #151b23;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .jaccard-progress span {
-            display: block;
-            height: 100%;
-            background: var(--cyan);
-            width: var(--progress, 0%);
-            border-radius: 6px;
-        }
-
         .status-footer {
-            margin-top: auto;
             text-align: right;
             font-size: 10px;
             font-weight: 600;
             color: var(--text-muted);
             padding-top: 16px;
             text-transform: uppercase;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            margin-top: 24px;
         }
 
         .status-footer span {
@@ -598,7 +589,7 @@
             </div>
             <div class="logo-text">GEO-SEG <span>INTERACTIVE</span></div>
             <div class="logo-actions">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </div>
         </header>
@@ -606,36 +597,42 @@
         <!-- Main Layout -->
         <div class="layout">
             <!-- Left Panel -->
-            <div class="panel panel-padding">
+            <div class="panel">
                 <div class="section-title">Layer Management & Stats</div>
                 
-                <div class="toggles-container" id="toggle-list">
-                    <!-- Toggles injected via JS -->
+                <div class="inner-box">
+                    <div class="toggles-container" id="toggle-list">
+                        <!-- Toggles injected via JS -->
+                    </div>
                 </div>
 
                 <div class="section-title">Stats</div>
-                <div class="stats-grid">
-                    <div class="stat-row">
-                        <span class="stat-key">Region</span>
-                        <span class="stat-value">Tashkent A.O.I.</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-key">Image Pixels</span>
-                        <span class="stat-value" id="stat-total-pixels">0</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-key">Detected Classes</span>
-                        <span class="stat-value" id="stat-class-count">0 / 6</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-key" style="border:none">Dominant Class</span>
-                        <span class="stat-value" id="stat-dominant">None</span>
+                
+                <div class="inner-box">
+                    <div class="stats-grid">
+                        <div class="stat-row">
+                            <span class="stat-key">Region</span>
+                            <span class="stat-value">Tashkent A.O.I.</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-key">Image Pixels</span>
+                            <span class="stat-value" id="stat-total-pixels">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-key">Detected Classes</span>
+                            <span class="stat-value" id="stat-class-count">0 / 6</span>
+                        </div>
+                        <div class="stat-row" style="border-bottom: none; padding-bottom: 0;">
+                            <span class="stat-key">Dominant Class</span>
+                            <span class="stat-value" id="stat-dominant">None</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Replace donut charts with nice progress bars for our classes -->
-                <div class="class-coverage-container" id="class-stats">
-                    <!-- Coverage injected via JS -->
+                <div class="inner-box">
+                    <div class="class-coverage-container" id="class-stats">
+                        <!-- Coverage injected via JS -->
+                    </div>
                 </div>
             </div>
 
@@ -652,33 +649,62 @@
             </div>
 
             <!-- Right Panel -->
-            <div class="panel panel-padding">
+            <div class="panel">
                 <div class="section-title">Analysis Results</div>
                 
-                <div class="preview-box" id="preview-box">
-                    <div class="empty-box" id="preview-empty">No Input</div>
-                    <div class="preview-box-content" id="preview-content"></div>
+                <div class="inner-box">
+                    <div class="preview-box" id="preview-box">
+                        <div class="empty-box" id="preview-empty">No Input</div>
+                        <div class="preview-box-content" id="preview-content"></div>
+                    </div>
+
+                    <div class="legend-grid" id="legend">
+                        <!-- Legend items injected via JS to look like stat rows -->
+                    </div>
+
+                    <div class="chart-wrapper">
+                        <!-- Y Axis Labels & Grid Lines -->
+                        <div style="position: absolute; left: 0; top: 0; bottom: 25px; right: 0; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div class="chart-grid-line"><span>300</span></div>
+                            <div class="chart-grid-line"><span>200</span></div>
+                            <div class="chart-grid-line"><span>100</span></div>
+                            <div class="chart-grid-line" style="border-bottom: 1px solid rgba(255,255,255,0.05); flex: 0;"><span>0</span></div>
+                        </div>
+                        
+                        <div class="area-chart">
+                            <svg viewBox="0 0 360 100" preserveAspectRatio="none">
+                                <path id="profile-fill" d="M0 100 L0 90 L72 90 L144 90 L216 90 L288 90 L360 90 L360 100 Z" fill="rgba(63, 217, 203, 0.4)"></path>
+                                <path id="profile-line" d="M0 90 L72 90 L144 90 L216 90 L288 90 L360 90" fill="none" stroke="#3fd9cb" stroke-width="2"></path>
+                            </svg>
+                        </div>
+
+                        <div class="chart-labels">
+                            <span>Class 1</span><span>Class 2</span><span>Class 3</span><span>Class 4</span><span>Class 5</span><span>Class 6</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="legend-list" id="legend"></div>
+                <div class="inner-box">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">
+                        <span style="color: var(--text-muted);">V3 Model Confidence</span>
+                        <span style="color: var(--cyan);" id="confidence-value">89.2%</span>
+                    </div>
+                    
+                    <div class="confidence-bars" id="confidence-bars"></div>
 
-                <div class="area-chart">
-                    <svg viewBox="0 0 360 100" preserveAspectRatio="none">
-                        <path id="profile-fill" d="M0 100 L0 90 L72 90 L144 90 L216 90 L288 90 L360 90 L360 100 Z" fill="rgba(63, 217, 203, 0.4)"></path>
-                        <path id="profile-line" d="M0 90 L72 90 L144 90 L216 90 L288 90 L360 90" fill="none" stroke="#3fd9cb" stroke-width="2"></path>
-                    </svg>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">
+                        <span style="color: var(--text-muted);">Jaccard Index</span>
+                        <span style="color: var(--cyan);" id="jaccard-value">0.312</span>
+                    </div>
+                    
+                    <div class="coverage-track" style="height: 24px;">
+                        <div class="coverage-fill" id="jaccard-bar" style="width: 31.2%;"></div>
+                    </div>
+
+                    <div class="status-footer">
+                        System: <span style="color: var(--cyan);">V3 Model Deployed</span>
+                    </div>
                 </div>
-                <div class="chart-labels">
-                    <span>Class 1</span><span>Class 2</span><span>Class 3</span><span>Class 4</span><span>Class 5</span><span>Class 6</span>
-                </div>
-
-                <div class="confidence-label">V3 Model Confidence: <span id="confidence-value">89.2%</span></div>
-                <div class="confidence-bars" id="confidence-bars"></div>
-
-                <div class="jaccard-label">Jaccard Index: <span id="jaccard-value">0.312</span></div>
-                <div class="jaccard-progress"><span id="jaccard-bar" style="--progress: 31.2%"></span></div>
-
-                <div class="status-footer">System: <span>V3 Model Deployed</span></div>
             </div>
         </div>
     </div>
@@ -699,18 +725,15 @@
         const fileInput = document.getElementById("file-input");
         const dropzone = document.getElementById("dropzone");
         const uploadZone = document.getElementById("upload-zone");
-        const previewBox = document.getElementById("preview-box");
         const previewEmpty = document.getElementById("preview-empty");
         const numberFormat = new Intl.NumberFormat("en-US");
 
         const toggles = {};
         const mapLayers = {};
         const previewLayers = {};
-        let uploadedLayer = null;
         let predictionData = null;
 
         /* ── Tile Layers ── */
-        // Use Esri World Imagery as the primary satellite basemap
         const satelliteLayer = L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
             {
@@ -740,14 +763,7 @@
             wheelPxPerZoomLevel: 120
         });
 
-        map.createPane("uploadedPane");
-        map.createPane("predictionPane");
-        map.getPane("uploadedPane").style.zIndex = 360;
-        map.getPane("predictionPane").style.zIndex = 460;
-
         satelliteLayer.addTo(map);
-
-        // Removed L.rectangle to get rid of the cyan box on the map
 
         map.fitBounds(bounds, { padding: [18, 18] });
 
@@ -790,9 +806,16 @@
                 toggles[item.key].addEventListener("change", syncLayerVisibility);
             });
 
+            // Update Legend to use the "boxes feel" like the left panel stats rows
             const legend = document.getElementById("legend");
             legend.innerHTML = CLASS_META.map((item) => (
-                `<div class="legend-item" style="--class-color:${item.color}">Class ${item.id}: ${item.label} (${item.color})</div>`
+                `<div class="stat-row" style="padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <div style="display:flex; align-items:center;">
+                        <div class="swatch-icon" style="--class-color:${item.color}"></div>
+                        <span class="stat-key" style="margin:0; text-transform:none; color: var(--text-main);">Class ${item.id}: ${item.label}</span>
+                    </div>
+                    <span style="font-size: 10px; color: ${item.color}; font-family: monospace;">${item.color}</span>
+                </div>`
             )).join("");
 
             const bars = document.getElementById("confidence-bars");
@@ -882,7 +905,7 @@
 
             document.getElementById("confidence-value").textContent = `${Number(data.stats.confidence || 89.2).toFixed(1)}%`;
             document.getElementById("jaccard-value").textContent = Number(data.stats.jaccard_index || 0.312).toFixed(3);
-            document.getElementById("jaccard-bar").style.setProperty("--progress", `${Math.min(100, (data.stats.jaccard_index || 0.312) * 100)}%`);
+            document.getElementById("jaccard-bar").style.width = `${Math.min(100, (data.stats.jaccard_index || 0.312) * 100)}%`;
             renderClassProfile(ordered);
         }
 
@@ -890,11 +913,11 @@
             const maxValue = Math.max(1, ...items.map((item) => item.percent));
             const width = 360;
             const height = 100;
-            const bottom = 90;
+            const bottom = 100;
             const points = items.map((item, index) => {
                 const x = index * (width / (items.length - 1));
                 const scaled = item.percent / maxValue;
-                const y = bottom - Math.max(4, scaled * 80);
+                const y = bottom - Math.max(4, scaled * 96);
                 return [x, y];
             });
             const line = points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
