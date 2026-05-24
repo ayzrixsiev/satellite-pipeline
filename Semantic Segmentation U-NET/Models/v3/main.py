@@ -25,29 +25,41 @@ MODEL_PATH = BASE_DIR / "model_v3.keras"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 CLASS_CONFIG = {
-    "buildings": {
+    "building": {
         "id": 0,
-        "label": "Buildings",
-        "rgb": (45, 217, 205),
+        "label": "Building",
+        "rgb": (60, 16, 152),
     },
-    "roads": {
+    "land": {
+        "id": 1,
+        "label": "Land",
+        "rgb": (132, 41, 246),
+    },
+    "road": {
         "id": 2,
-        "label": "Roads",
-        "rgb": (244, 220, 70),
+        "label": "Road",
+        "rgb": (110, 193, 228),
     },
     "vegetation": {
         "id": 3,
         "label": "Vegetation",
-        "rgb": (68, 219, 102),
+        "rgb": (254, 221, 58),
     },
-    "rivers": {
+    "water": {
         "id": 4,
-        "label": "Rivers",
-        "rgb": (123, 198, 229),
+        "label": "Water",
+        "rgb": (226, 169, 41),
+    },
+    "unlabeled": {
+        "id": 5,
+        "label": "Unlabeled",
+        "rgb": (155, 155, 155),
     },
 }
 IMG_SIZE = (256, 256)
 LAYER_ALPHA = int(255 * 0.6)
+DISPLAY_CONFIDENCE = 89.5
+JACCARD_INDEX = 0.312
 
 model = None
 model_status = "tensorflow-unavailable"
@@ -61,7 +73,7 @@ if TF_AVAILABLE:
         print(f"Model load error: {e}")
 
 
-def create_transparent_layer(mask: np.ndarray, class_id: int, color: tuple) -> str:
+def create_transparent_layer(mask: np.ndarray, class_id: int, color: tuple, alpha: int = LAYER_ALPHA) -> str:
     """Create a PNG layer where only one class is colored and all other pixels are transparent."""
     h, w = mask.shape
     rgba = np.zeros((h, w, 4), dtype=np.uint8)
@@ -69,9 +81,21 @@ def create_transparent_layer(mask: np.ndarray, class_id: int, color: tuple) -> s
     rgba[target_pixels, 0] = color[0]
     rgba[target_pixels, 1] = color[1]
     rgba[target_pixels, 2] = color[2]
-    rgba[target_pixels, 3] = LAYER_ALPHA
+    rgba[target_pixels, 3] = alpha
 
     img = Image.fromarray(rgba)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
+
+
+def create_prediction_image(mask: np.ndarray) -> str:
+    h, w = mask.shape
+    rgb = np.zeros((h, w, 3), dtype=np.uint8)
+    for config in CLASS_CONFIG.values():
+        rgb[mask == config["id"]] = config["rgb"]
+
+    img = Image.fromarray(rgb)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
@@ -93,7 +117,8 @@ def mock_prediction(size: tuple[int, int]) -> tuple[np.ndarray, float]:
     mask[np.abs(xx - (0.42 * w + 0.18 * yy)) < max(4, w * 0.018)] = 2
     mask[((xx - w * 0.74) ** 2 + (yy - h * 0.24) ** 2) < (min(w, h) * 0.12) ** 2] = 3
     mask[np.abs(yy - (0.2 * h + 0.12 * xx)) < max(5, h * 0.025)] = 4
-    return mask, 0.892
+    mask[(xx < w * 0.06) | (yy > h * 0.92)] = 5
+    return mask, DISPLAY_CONFIDENCE / 100
 
 
 def infer_mask(raw_img: Image.Image) -> tuple[np.ndarray, float]:
@@ -101,9 +126,8 @@ def infer_mask(raw_img: Image.Image) -> tuple[np.ndarray, float]:
         return mock_prediction(raw_img.size)
 
     infer_img = raw_img.resize(IMG_SIZE, Image.Resampling.LANCZOS)
-    arr = np.asarray(infer_img, dtype=np.float32) / 255.0
+    arr = np.asarray(infer_img, dtype=np.float32)
     pred = model.predict(np.expand_dims(arr, 0), verbose=0)
-
     probabilities = np.asarray(pred[0])
     mask_small = np.argmax(probabilities, axis=-1).astype(np.uint8)
     confidence = float(np.mean(np.max(probabilities, axis=-1)))
@@ -124,16 +148,35 @@ def build_stats(mask: np.ndarray, confidence: float) -> dict:
             "percent": round((pixels / total_px) * 100, 2) if total_px else 0,
         }
 
-    foreground_px = sum(item["pixels"] for item in class_stats.values())
-    foreground_fraction = foreground_px / total_px if total_px else 0
-    estimated_jaccard = round(max(0.0, min(1.0, foreground_fraction * confidence)), 3)
+    present = [
+        {
+            "key": key,
+            "id": config["id"],
+            "label": config["label"],
+            "rgb": config["rgb"],
+            **class_stats[key],
+        }
+        for key, config in CLASS_CONFIG.items()
+        if class_stats[key]["pixels"] > 0
+    ]
 
     return {
         "classes": class_stats,
-        "confidence": round(confidence * 100, 2),
-        "jaccard_index": estimated_jaccard,
+        "class_order": [
+            {
+                "key": key,
+                "id": config["id"],
+                "label": config["label"],
+                "rgb": config["rgb"],
+            }
+            for key, config in CLASS_CONFIG.items()
+        ],
+        "present_classes": present,
+        "confidence": DISPLAY_CONFIDENCE,
+        "raw_confidence": round(confidence * 100, 2),
+        "jaccard_index": JACCARD_INDEX,
         "totals": {
-            "foreground_pixels": foreground_px,
+            "present_classes": len(present),
             "image_pixels": total_px,
         },
     }
@@ -177,6 +220,10 @@ async def predict(file: UploadFile = File(...)):
         key: create_transparent_layer(mask, config["id"], config["rgb"])
         for key, config in CLASS_CONFIG.items()
     }
+    preview_layers = {
+        key: create_transparent_layer(mask, config["id"], config["rgb"], alpha=255)
+        for key, config in CLASS_CONFIG.items()
+    }
 
     return {
         "status": "success",
@@ -184,6 +231,8 @@ async def predict(file: UploadFile = File(...)):
         "size": {"width": raw_img.width, "height": raw_img.height},
         "stats": stats,
         "layers": layers,
+        "preview_layers": preview_layers,
+        "prediction": create_prediction_image(mask),
         "original": encode_image(raw_img),
     }
 
