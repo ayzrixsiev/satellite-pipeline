@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEO-SEG Interactive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQO3GQtfpI3ux5x64E5xOew5iYghxw=" crossorigin="">
+    <style>
+        :root {
+            --screen: #0d1620;
+            --panel: #1b2b3a;
+            --panel-deep: #132231;
+            --panel-soft: #223547;
+            --line: #31495d;
+            --line-bright: #43d8cf;
+            --cyan: #2dd9cd;
+            --cyan-soft: rgba(45, 217, 205, 0.18);
+            --road: #f4dc46;
+            --river: #7bc6e5;
+            --veg: #44db66;
+            --text: #edf7fb;
+            --muted: #9fb4c4;
+            --shadow: rgba(0, 0, 0, 0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 18% 22%, rgba(61, 211, 200, 0.12), transparent 30%),
+                linear-gradient(135deg, #070b10, #101820 44%, #06090d);
+            color: var(--text);
+            font-family: "Rajdhani", "Segoe UI", Arial, sans-serif;
+            letter-spacing: 0;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .screen-frame {
+            width: min(1820px, calc(100vw - 32px));
+            height: min(980px, calc(100vh - 32px));
+            margin: 16px auto;
+            padding: 14px;
+            border: 2px solid #111820;
+            border-radius: 14px;
+            background: #080d12;
+            box-shadow: 0 24px 70px var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .dashboard {
+            height: 100%;
+            display: grid;
+            grid-template-rows: 64px 1fr 28px;
+            overflow: hidden;
+            border: 1px solid #233545;
+            background: linear-gradient(180deg, #152331 0%, var(--screen) 100%);
+        }
+
+        .topbar,
+        .statusbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(90deg, #162433, #1b2b3b);
+            border-bottom: 1px solid var(--line);
+            padding: 0 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            width: 32px;
+            height: 32px;
+            display: grid;
+            place-items: center;
+            border: 2px solid var(--cyan);
+            border-radius: 50%;
+            color: var(--cyan);
+            font-size: 21px;
+            line-height: 1;
+        }
+
+        .brand-title {
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+            white-space: nowrap;
+            font-size: clamp(22px, 1.8vw, 30px);
+            font-weight: 700;
+        }
+
+        .brand-title span:last-child {
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .top-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--muted);
+        }
+
+        .icon-button {
+            width: 34px;
+            height: 34px;
+            border: 0;
+            border-radius: 6px;
+            display: grid;
+            place-items: center;
+            color: currentColor;
+            background: transparent;
+            cursor: default;
+        }
+
+        .icon-button svg,
+        .brand-mark svg {
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .content {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 300px minmax(460px, 1fr) 350px;
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .panel,
+        .map-shell {
+            min-height: 0;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(27, 43, 58, 0.96);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+        }
+
+        .panel {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-block {
+            padding: 12px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .panel-block:last-child {
+            border-bottom: 0;
+        }
+
+        .panel-title {
+            margin: 0 0 10px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #f4fbff;
+            text-transform: uppercase;
+        }
+
+        .layer-row {
+            height: 44px;
+            display: grid;
+            grid-template-columns: 36px 1fr 48px;
+            align-items: center;
+            gap: 8px;
+            color: #f3fbff;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .layer-icon {
+            width: 28px;
+            height: 28px;
+            display: grid;
+            place-items: center;
+            color: var(--icon-color);
+        }
+
+        .layer-icon svg {
+            width: 27px;
+            height: 27px;
+            display: block;
+            fill: currentColor;
+            stroke: currentColor;
+            stroke-width: 1.4;
+        }
+
+        .switch {
+            position: relative;
+            width: 46px;
+            height: 24px;
+            display: inline-flex;
+        }
+
+        .switch input {
+            width: 0;
+            height: 0;
+            opacity: 0;
+        }
+
+        .switch span {
+            position: absolute;
+            inset: 0;
+            border: 1px solid #3b5368;
+            border-radius: 999px;
+            background: #344657;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.32);
+            cursor: pointer;
+            transition: 160ms ease;
+        }
+
+        .switch span::before {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            top: 2px;
+            border-radius: 50%;
+            background: #dbe8ef;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+            transition: 160ms ease;
+        }
+
+        .switch input:checked + span {
+            border-color: rgba(62, 241, 231, 0.7);
+            background: linear-gradient(90deg, #27c2bc, #3febdf);
+        }
+
+        .switch input:checked + span::before {
+            transform: translateX(21px);
+            background: #f6ffff;
+        }
+
+        .stat-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .stat-line {
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: var(--panel-deep);
+            color: #f4fbff;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .stat-line strong {
+            color: #b8f7f2;
+            font-weight: 500;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .gauge-grid {
+            display: grid;
+            gap: 8px;
+        }
+
+        .gauge-row {
+            min-height: 58px;
+            display: grid;
+            grid-template-columns: 82px 72px 1fr;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: var(--panel-deep);
+            text-transform: uppercase;
+        }
+
+        .gauge-label {
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .gauge-value {
+            color: #c8fbf7;
+            text-align: right;
+            font-size: 16px;
+        }
+
+        .gauge {
+            width: 58px;
+            height: 30px;
+            justify-self: end;
+            border-radius: 58px 58px 0 0;
+            background:
+                radial-gradient(circle at 50% 100%, var(--panel-deep) 0 52%, transparent 54%),
+                conic-gradient(from 270deg at 50% 100%, var(--gauge-color) calc(var(--value, 0) * 1.8deg), #395064 0 180deg, transparent 0);
+        }
+
+        .map-shell {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #111b25;
+        }
+
+        .upload-rail {
+            height: 98px;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            margin: 10px;
+            border: 2px dashed rgba(67, 216, 207, 0.72);
+            border-radius: 6px;
+            background: rgba(17, 29, 40, 0.92);
+            color: var(--cyan);
+            cursor: pointer;
+            transition: border-color 160ms ease, background 160ms ease;
+            z-index: 5;
+        }
+
+        .upload-rail.dragover {
+            border-color: #f4fbff;
+            background: rgba(45, 217, 205, 0.12);
+        }
+
+        .upload-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            min-width: 0;
+            text-transform: uppercase;
+            font-size: 19px;
+            font-weight: 600;
+        }
+
+        .upload-icon {
+            width: 56px;
+            height: 56px;
+            display: grid;
+            place-items: center;
+            border: 2px dashed rgba(67, 216, 207, 0.78);
+            border-radius: 8px;
+        }
+
+        .upload-icon svg {
+            width: 30px;
+            height: 30px;
+            stroke: currentColor;
+        }
+
+        .loader {
+            width: 28px;
+            height: 28px;
+            display: none;
+            border: 3px solid rgba(67, 216, 207, 0.18);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 850ms linear infinite;
+        }
+
+        .busy .upload-icon svg {
+            display: none;
+        }
+
+        .busy .loader {
+            display: block;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .map-wrap {
+            position: relative;
+            flex: 1 1 auto;
+            min-height: 0;
+            margin: 0 10px 10px;
+            border: 1px solid var(--line);
+            border-radius: 5px;
+            overflow: hidden;
+            background: #0b1219;
+        }
+
+        #map {
+            position: absolute;
+            inset: 0;
+            background: #0b1219;
+        }
+
+        .map-wrap::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            box-shadow: inset 0 0 0 1px rgba(63, 235, 223, 0.12), inset 0 0 28px rgba(0, 0, 0, 0.35);
+            z-index: 401;
+        }
+
+        .leaflet-control-zoom a {
+            background: rgba(20, 34, 47, 0.94);
+            color: #dffdfb;
+            border-bottom-color: #2e465a;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background: #22384b;
+            color: #fff;
+        }
+
+        .leaflet-container {
+            font-family: inherit;
+        }
+
+        .leaflet-control-attribution {
+            display: none;
+        }
+
+        .analysis {
+            min-height: 0;
+        }
+
+        .result-preview {
+            position: relative;
+            aspect-ratio: 1 / 0.86;
+            overflow: hidden;
+            border: 2px solid var(--line-bright);
+            border-radius: 4px;
+            background: #0f1d29;
+        }
+
+        .result-preview img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .result-preview img.preview-visible {
+            display: block;
+        }
+
+        .preview-empty {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            color: #6f899b;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .legend {
+            display: grid;
+            gap: 2px;
+            margin-top: 8px;
+            padding: 0 2px;
+            font-size: 13px;
+            line-height: 1.18;
+        }
+
+        .legend span {
+            color: var(--legend-color);
+        }
+
+        .line-chart {
+            position: relative;
+            height: 110px;
+            margin-top: 10px;
+            border-top: 1px solid rgba(159, 180, 196, 0.24);
+            border-bottom: 1px solid rgba(159, 180, 196, 0.24);
+            background:
+                linear-gradient(rgba(159, 180, 196, 0.14) 1px, transparent 1px) 0 0 / 100% 33.333%,
+                rgba(13, 25, 36, 0.54);
+        }
+
+        .line-chart svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-labels {
+            height: 24px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            align-items: end;
+            color: #e4f8fb;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .model-block {
+            padding: 12px;
+            border-top: 1px solid var(--line);
+            background: rgba(19, 34, 49, 0.7);
+        }
+
+        .confidence-title {
+            margin: 0 0 8px;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .confidence-title span {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .bars {
+            height: 110px;
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            align-items: end;
+            gap: 5px;
+            padding: 8px 4px 0;
+            border-bottom: 1px solid rgba(219, 241, 247, 0.7);
+            background:
+                linear-gradient(rgba(159, 180, 196, 0.14) 1px, transparent 1px) 0 0 / 100% 50%;
+        }
+
+        .bars i {
+            display: block;
+            min-height: 8px;
+            height: var(--bar-height, 35%);
+            border-radius: 2px 2px 0 0;
+            background: linear-gradient(180deg, #60fff5, #27bdb6);
+            opacity: 0.88;
+        }
+
+        .jaccard {
+            margin-top: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .progress {
+            height: 30px;
+            margin-top: 6px;
+            overflow: hidden;
+            border-radius: 4px;
+            background: #35485a;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .progress span {
+            display: block;
+            height: 100%;
+            width: var(--progress-width, 0%);
+            background: linear-gradient(90deg, #21c3bd, #4af0e6);
+            transition: width 220ms ease;
+        }
+
+        .statusbar {
+            justify-content: flex-end;
+            border-top: 1px solid var(--line);
+            border-bottom: 0;
+            color: #f4fbff;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .statusbar span {
+            color: var(--cyan);
+            margin-left: 4px;
+        }
+
+        .hidden-input {
+            position: fixed;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @media (max-width: 1160px) {
+            body {
+                overflow: auto;
+            }
+
+            .screen-frame {
+                width: 100%;
+                min-height: 100vh;
+                height: auto;
+                margin: 0;
+                border-radius: 0;
+            }
+
+            .dashboard {
+                min-height: 100vh;
+            }
+
+            .content {
+                grid-template-columns: 260px minmax(360px, 1fr);
+                grid-template-rows: minmax(620px, 1fr) auto;
+            }
+
+            .analysis {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard {
+                grid-template-rows: auto 1fr auto;
+            }
+
+            .topbar {
+                min-height: 64px;
+            }
+
+            .brand-title {
+                flex-direction: column;
+                gap: 0;
+                line-height: 0.9;
+            }
+
+            .content {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 560px auto;
+            }
+
+            .upload-inner {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <input id="file-input" class="hidden-input" type="file" accept="image/*">
+
+    <main class="screen-frame">
+        <section class="dashboard">
+            <header class="topbar">
+                <div class="brand">
+                    <div class="brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <path d="M3 12h18"></path>
+                            <path d="M12 3c3 3 3 15 0 18"></path>
+                            <path d="M12 3c-3 3-3 15 0 18"></path>
+                        </svg>
+                    </div>
+                    <div class="brand-title">
+                        <span>GEO-SEG</span>
+                        <span>INTERACTIVE</span>
+                    </div>
+                </div>
+                <div class="top-actions" aria-hidden="true">
+                    <button class="icon-button" type="button">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 2v3"></path>
+                            <path d="M12 19v3"></path>
+                            <path d="M2 12h3"></path>
+                            <path d="M19 12h3"></path>
+                            <path d="m4.9 4.9 2.1 2.1"></path>
+                            <path d="m17 17 2.1 2.1"></path>
+                            <path d="m19.1 4.9-2.1 2.1"></path>
+                            <path d="m7 17-2.1 2.1"></path>
+                        </svg>
+                    </button>
+                    <button class="icon-button" type="button">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <path d="M16 17l5-5-5-5"></path>
+                            <path d="M21 12H9"></path>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content">
+                <aside class="panel">
+                    <div class="panel-block">
+                        <h2 class="panel-title">Layer Management & Stats</h2>
+
+                        <div class="layer-row">
+                            <span class="layer-icon" style="--icon-color: #b7c3ce;" aria-hidden="true">
+                                <svg viewBox="0 0 32 32"><path d="M6 21h7v7H6zM19 4h7v7h-7zM11 9h6v6h-6zM17 17h8v8h-8z"/><path d="M8 23 22 9M8 28l18-18" fill="none"/></svg>
+                            </span>
+                            <span>Satellite Basemap</span>
+                            <label class="switch"><input type="checkbox" id="toggle-basemap" checked><span></span></label>
+                        </div>
+
+                        <div class="layer-row">
+                            <span class="layer-icon" style="--icon-color: var(--cyan);" aria-hidden="true">
+                                <svg viewBox="0 0 32 32"><path d="m5 11 13-5 9 5-3 15-11 2-2-9-7-2z"/></svg>
+                            </span>
+                            <span>Buildings</span>
+                            <label class="switch"><input type="checkbox" id="toggle-buildings" checked><span></span></label>
+                        </div>
+
+                        <div class="layer-row">
+                            <span class="layer-icon" style="--icon-color: var(--river);" aria-hidden="true">
+                                <svg viewBox="0 0 32 32"><path d="M4 8c8 0 7 9 13 9 5 0 5 7 11 7v4c-8 0-8-7-13-7C9 21 10 12 4 12z"/></svg>
+                            </span>
+                            <span>Rivers</span>
+                            <label class="switch"><input type="checkbox" id="toggle-rivers" checked><span></span></label>
+                        </div>
+
+                        <div class="layer-row">
+                            <span class="layer-icon" style="--icon-color: var(--road);" aria-hidden="true">
+                                <svg viewBox="0 0 32 32"><path d="M6 27 25 5l2 2L8 29z"/></svg>
+                            </span>
+                            <span>Roads</span>
+                            <label class="switch"><input type="checkbox" id="toggle-roads" checked><span></span></label>
+                        </div>
+
+                        <div class="layer-row">
+                            <span class="layer-icon" style="--icon-color: var(--veg);" aria-hidden="true">
+                                <svg viewBox="0 0 32 32"><path d="M16 4c4 3 7 4 11 4 1 5-1 10-5 13-3 2-6 2-8 1-2 2-4 4-8 4 1-4 2-7 5-9-2-6 0-10 5-13z"/></svg>
+                            </span>
+                            <span>Vegetation</span>
+                            <label class="switch"><input type="checkbox" id="toggle-vegetation" checked><span></span></label>
+                        </div>
+                    </div>
+
+                    <div class="panel-block">
+                        <h2 class="panel-title">Stats</h2>
+                        <div class="stat-list">
+                            <div class="stat-line"><span>Region</span><strong>Tashkent A.O.I.</strong></div>
+                            <div class="stat-line"><span>Total Bldgs</span><strong id="total-buildings">0</strong></div>
+                            <div class="stat-line"><span>Total River Area</span><strong id="total-rivers">0 PX</strong></div>
+                            <div class="stat-line"><span>Total Area</span><strong id="total-area">0 SQ PX</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="panel-block">
+                        <div class="gauge-grid">
+                            <div class="gauge-row" style="--gauge-color: var(--cyan);">
+                                <span class="gauge-label">Bldg%</span>
+                                <span class="gauge-value" id="pct-buildings">0.0%</span>
+                                <span class="gauge" id="gauge-buildings"></span>
+                            </div>
+                            <div class="gauge-row" style="--gauge-color: var(--river);">
+                                <span class="gauge-label">River%</span>
+                                <span class="gauge-value" id="pct-rivers">0.0%</span>
+                                <span class="gauge" id="gauge-rivers"></span>
+                            </div>
+                            <div class="gauge-row" style="--gauge-color: var(--veg);">
+                                <span class="gauge-label">Veg%</span>
+                                <span class="gauge-value" id="pct-vegetation">0.0%</span>
+                                <span class="gauge" id="gauge-vegetation"></span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <section class="map-shell" id="dropzone">
+                    <div class="upload-rail" id="upload-rail">
+                        <div class="upload-inner">
+                            <span class="upload-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 16V4"></path>
+                                    <path d="m7 9 5-5 5 5"></path>
+                                    <path d="M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path>
+                                </svg>
+                                <span class="loader"></span>
+                            </span>
+                            <span id="upload-text">Drag satellite image here</span>
+                        </div>
+                    </div>
+
+                    <div class="map-wrap">
+                        <div id="map"></div>
+                    </div>
+                </section>
+
+                <aside class="panel analysis">
+                    <div class="panel-block">
+                        <h2 class="panel-title">Analysis Results</h2>
+                        <div class="result-preview" id="preview">
+                            <div class="preview-empty" id="preview-empty">Awaiting Image</div>
+                            <img id="preview-original" alt="">
+                            <img id="preview-buildings" alt="">
+                            <img id="preview-rivers" alt="">
+                            <img id="preview-roads" alt="">
+                            <img id="preview-vegetation" alt="">
+                        </div>
+
+                        <div class="legend">
+                            <span style="--legend-color: var(--cyan);">Class 1: Building (teal)</span>
+                            <span style="--legend-color: var(--river);">Class 2: River / Water (blue)</span>
+                            <span style="--legend-color: var(--road);">Class 3: Road (yellow)</span>
+                            <span style="--legend-color: var(--veg);">Class 4: Vegetation (green)</span>
+                        </div>
+
+                        <div class="line-chart">
+                            <svg viewBox="0 0 320 110" preserveAspectRatio="none" aria-hidden="true">
+                                <path id="chart-fill" d="M0 110 L0 92 L80 84 L160 76 L240 88 L320 70 L320 110 Z" fill="rgba(45, 217, 205, 0.58)"></path>
+                                <path id="chart-line" d="M0 92 L80 84 L160 76 L240 88 L320 70" fill="none" stroke="#43d8cf" stroke-width="3"></path>
+                            </svg>
+                        </div>
+                        <div class="chart-labels">
+                            <span>Class 1</span>
+                            <span>Class 2</span>
+                            <span>Class 3</span>
+                            <span>Class 4</span>
+                        </div>
+                    </div>
+
+                    <div class="model-block">
+                        <p class="confidence-title">V3 Model Confidence: <span id="confidence">0.0%</span></p>
+                        <div class="bars" id="bars" aria-hidden="true">
+                            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                        </div>
+                        <div class="jaccard">Jaccard Index: <span id="jaccard">0.000</span></div>
+                        <div class="progress"><span id="jaccard-bar"></span></div>
+                    </div>
+                </aside>
+            </div>
+
+            <footer class="statusbar">System: <span id="system-status">V3 Model Initializing</span></footer>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        const bounds = L.latLngBounds([[41.2930, 69.2320], [41.3060, 69.2480]]);
+        const layerKeys = ["buildings", "rivers", "roads", "vegetation"];
+        const toggles = {
+            basemap: document.getElementById("toggle-basemap"),
+            buildings: document.getElementById("toggle-buildings"),
+            rivers: document.getElementById("toggle-rivers"),
+            roads: document.getElementById("toggle-roads"),
+            vegetation: document.getElementById("toggle-vegetation")
+        };
+        const previews = {
+            original: document.getElementById("preview-original"),
+            buildings: document.getElementById("preview-buildings"),
+            rivers: document.getElementById("preview-rivers"),
+            roads: document.getElementById("preview-roads"),
+            vegetation: document.getElementById("preview-vegetation")
+        };
+
+        const fileInput = document.getElementById("file-input");
+        const dropzone = document.getElementById("dropzone");
+        const uploadRail = document.getElementById("upload-rail");
+        const uploadText = document.getElementById("upload-text");
+        const previewEmpty = document.getElementById("preview-empty");
+        const systemStatus = document.getElementById("system-status");
+        const numberFormat = new Intl.NumberFormat("en-US");
+
+        let tileLayer;
+        let uploadedLayer;
+        let predictionData = null;
+        const mapLayers = {};
+
+        const map = L.map("map", {
+            center: [41.2995, 69.2400],
+            zoom: 15,
+            minZoom: 2,
+            maxZoom: 21,
+            zoomControl: true,
+            attributionControl: false,
+            preferCanvas: true
+        });
+
+        map.createPane("uploadedPane");
+        map.createPane("predictionPane");
+        map.getPane("uploadedPane").style.zIndex = 360;
+        map.getPane("predictionPane").style.zIndex = 460;
+
+        tileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+            maxZoom: 21,
+            maxNativeZoom: 19
+        }).addTo(map);
+
+        L.rectangle(bounds, {
+            color: "#43d8cf",
+            weight: 1,
+            dashArray: "6 6",
+            fillOpacity: 0,
+            interactive: false
+        }).addTo(map);
+
+        map.fitBounds(bounds, { padding: [22, 22] });
+
+        function percent(value) {
+            return `${Number(value || 0).toFixed(1)}%`;
+        }
+
+        function setBusy(isBusy) {
+            uploadRail.classList.toggle("busy", isBusy);
+            uploadText.textContent = isBusy ? "Processing pipeline" : "Drag satellite image here";
+            if (isBusy) {
+                systemStatus.textContent = "Inference Running";
+            }
+        }
+
+        function addOrRemoveLayer(layer, shouldShow) {
+            if (!layer) return;
+            const visible = map.hasLayer(layer);
+            if (shouldShow && !visible) {
+                layer.addTo(map);
+            }
+            if (!shouldShow && visible) {
+                map.removeLayer(layer);
+            }
+        }
+
+        function syncLayerVisibility() {
+            addOrRemoveLayer(tileLayer, toggles.basemap.checked);
+
+            layerKeys.forEach((key) => {
+                addOrRemoveLayer(mapLayers[key], toggles[key].checked);
+                if (previews[key]) {
+                    previews[key].classList.toggle("preview-visible", Boolean(predictionData && toggles[key].checked));
+                }
+            });
+
+            if (previews.original) {
+                previews.original.classList.toggle("preview-visible", Boolean(predictionData));
+            }
+        }
+
+        function clearPredictionLayers() {
+            if (uploadedLayer && map.hasLayer(uploadedLayer)) {
+                map.removeLayer(uploadedLayer);
+            }
+
+            layerKeys.forEach((key) => {
+                if (mapLayers[key] && map.hasLayer(mapLayers[key])) {
+                    map.removeLayer(mapLayers[key]);
+                }
+                mapLayers[key] = null;
+            });
+        }
+
+        function renderMapLayers(data) {
+            clearPredictionLayers();
+
+            uploadedLayer = L.imageOverlay(data.original, bounds, {
+                pane: "uploadedPane",
+                opacity: 0.92,
+                interactive: false
+            }).addTo(map);
+
+            layerKeys.forEach((key) => {
+                mapLayers[key] = L.imageOverlay(data.layers[key], bounds, {
+                    pane: "predictionPane",
+                    interactive: false
+                });
+            });
+
+            map.fitBounds(bounds, { padding: [16, 16] });
+            syncLayerVisibility();
+        }
+
+        function renderPreview(data) {
+            previews.original.src = data.original;
+            layerKeys.forEach((key) => {
+                previews[key].src = data.layers[key];
+            });
+            previewEmpty.style.display = "none";
+            syncLayerVisibility();
+        }
+
+        function renderStats(data) {
+            const classes = data.stats.classes;
+            const total = data.stats.totals.image_pixels;
+            const confidence = data.stats.confidence || 0;
+            const jaccard = data.stats.jaccard_index || 0;
+
+            document.getElementById("total-buildings").textContent = numberFormat.format(classes.buildings.pixels);
+            document.getElementById("total-rivers").textContent = `${numberFormat.format(classes.rivers.pixels)} PX`;
+            document.getElementById("total-area").textContent = `${numberFormat.format(total)} SQ PX`;
+
+            ["buildings", "rivers", "vegetation"].forEach((key) => {
+                const pct = classes[key].percent || 0;
+                document.getElementById(`pct-${key}`).textContent = percent(pct);
+                document.getElementById(`gauge-${key}`).style.setProperty("--value", Math.min(100, pct));
+            });
+
+            document.getElementById("confidence").textContent = percent(confidence);
+            document.getElementById("jaccard").textContent = Number(jaccard).toFixed(3);
+            document.getElementById("jaccard-bar").style.setProperty("--progress-width", `${Math.min(100, jaccard * 100)}%`);
+
+            renderBars(confidence, classes);
+            renderLineChart(classes);
+        }
+
+        function renderBars(confidence, classes) {
+            const bars = Array.from(document.querySelectorAll("#bars i"));
+            const classValues = [classes.buildings.percent, classes.rivers.percent, classes.roads.percent, classes.vegetation.percent];
+            const seed = Math.max(24, Math.min(92, confidence));
+            bars.forEach((bar, index) => {
+                const classLift = classValues[index % classValues.length] * 1.8;
+                const wave = Math.sin(index * 0.62) * 11;
+                const height = Math.max(16, Math.min(96, seed - 24 + classLift + wave + index * 2.3));
+                bar.style.setProperty("--bar-height", `${height}%`);
+            });
+        }
+
+        function renderLineChart(classes) {
+            const values = [
+                classes.buildings.percent || 0,
+                classes.rivers.percent || 0,
+                classes.roads.percent || 0,
+                classes.vegetation.percent || 0
+            ];
+            const points = values.map((value, index) => {
+                const x = index * (320 / (values.length - 1));
+                const y = 104 - Math.min(96, Math.max(8, value * 2.2 + 10));
+                return [x, y];
+            });
+            const path = points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+            const fill = `${path} L320 110 L0 110 Z`;
+            document.getElementById("chart-line").setAttribute("d", path);
+            document.getElementById("chart-fill").setAttribute("d", fill);
+        }
+
+        async function processFile(file) {
+            if (!file || !file.type.startsWith("image/")) return;
+
+            setBusy(true);
+            let failed = false;
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const response = await fetch("/api/predict", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.detail || "Prediction request failed");
+                }
+
+                const data = await response.json();
+                predictionData = data;
+                renderMapLayers(data);
+                renderPreview(data);
+                renderStats(data);
+                systemStatus.textContent = data.model_status === "model-v3-loaded" ? "V3 Model Deployed" : data.model_status;
+            } catch (error) {
+                failed = true;
+                console.error(error);
+            } finally {
+                setBusy(false);
+                if (failed) {
+                    systemStatus.textContent = "Inference Error";
+                    uploadText.textContent = "Image processing failed";
+                }
+                fileInput.value = "";
+            }
+        }
+
+        uploadRail.addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", () => processFile(fileInput.files[0]));
+
+        ["dragenter", "dragover"].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                uploadRail.classList.add("dragover");
+            });
+        });
+
+        ["dragleave", "drop"].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                uploadRail.classList.remove("dragover");
+            });
+        });
+
+        dropzone.addEventListener("drop", (event) => {
+            processFile(event.dataTransfer.files[0]);
+        });
+
+        document.addEventListener("paste", (event) => {
+            const items = Array.from(event.clipboardData?.items || []);
+            const imageItem = items.find((item) => item.type.startsWith("image/"));
+            if (imageItem) {
+                processFile(imageItem.getAsFile());
+            }
+        });
+
+        Object.values(toggles).forEach((toggle) => {
+            toggle.addEventListener("change", syncLayerVisibility);
+        });
+
+        fetch("/api/status")
+            .then((response) => response.json())
+            .then((data) => {
+                systemStatus.textContent = data.status === "model-v3-loaded" ? "V3 Model Deployed" : data.status;
+            })
+            .catch(() => {
+                systemStatus.textContent = "Status Unavailable";
+            });
+    </script>
+</body>
+</html>
